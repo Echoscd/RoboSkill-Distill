@@ -1,0 +1,61 @@
+name: track
+kind: controller
+description: >-
+  Observe devices, ask a model to infer an absolute joint target, and write it to
+  one joint-controlled device without waiting for arrival. Actions use resolved model joint order,
+  radians or metres by joint type. Model-specific action conversion belongs in the
+  model driver. Requires joint metadata. Stops on every exit.
+  Ends on model done, a perception predicate, the iteration budget or wall timeout.
+  rate_hz caps wall-clock loop frequency, not simulation time. Slow inference lowers
+  achieved rate; no queued catch-up actions. Driver/service owns SDK sending and
+  interpolation. Gripper control and multi-device commanding are not supported.
+parameters:
+  type: object
+  properties:
+    model:
+      type: string
+      description: model device serving an "infer" action (obs → action)
+    observe:
+      type: array
+      items: { type: string }
+      description: device names read each step, in order; their readings are passed to infer as obs
+    command:
+      type: string
+      description: joint-controlled device that receives each action via its "write"
+    task:
+      type: string
+      description: task/goal handed to the model (e.g. a language instruction)
+    max_steps:
+      type: integer
+      minimum: 1
+      description: step budget (default 50)
+    rate_hz:
+      type: number
+      exclusiveMinimum: 0
+      description: wall-clock loop rate cap; defaults to 20 Hz, independent of the device control period
+    timeout_s:
+      type: number
+      exclusiveMinimum: 0
+      maximum: 590
+      default: 590
+      description: soft wall-clock budget; manifest hard cap is 600s
+    until:
+      type: object
+      description: optional termination predicate — a PERCEPTION tool run every check_every steps; truthy `key` in its result stops the loop
+      properties:
+        tool: { type: string }
+        args: { type: object }
+        key: { type: string, description: "result key to test (default: done)" }
+        check_every: { type: integer, description: "steps between checks (default: 5)" }
+      required: [tool]
+  required: [model, observe, command]
+timeout_s: 600
+device_inputs:
+  model:
+    types: [model]
+  command:
+    types: [joint]
+  observe[]:
+    types: [joint, gripper, dexterous_hand, suction, velocity, rgb, rgbd, force_torque, imu]
+devices: [model, joint]
+requires: access:model,intrinsics:model

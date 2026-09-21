@@ -1,0 +1,31 @@
+Record a task's device observations, actions and session trace.
+
+- start {devices: {"arm": 10, "wrist_cam": 2}, instruction?}
+  Start continuous background capture until stop or the recording size limit. Device
+  names and sampling rates are fixed at start; stop before changing them. Native driver
+  capture is preferred, otherwise the harness reads at the requested rate. Cameras need
+  ffmpeg in the capture environment. Slow sampling holds the last observation in video,
+  preserving real elapsed time. The instruction names the task being attempted.
+- snap {devices: ["arm", "wrist_cam"], instruction?}
+  Read each device once and mark a decision point. During recording this adds a moment;
+  otherwise it saves a standalone snapshot. Returns paths and data, never image attachments.
+- stop {outcome?, summary?}
+  Finish capture and save its products. Outcome is success, failure or partial. The result
+  includes the recording directory, per-device video/state paths, and capture errors.
+- status {}
+  Flush the current recording and list running/recent recordings, their directories,
+  capture status, effective rates, frame counts, products and errors.
+
+Recording continues while the agent thinks and between turns. No automatic pause or
+segmentation. Ordinary device traffic is also recorded: designated devices under devices/,
+others under passive/. snap preserves the original image; background cameras write a single
+stream/video.mp4 plus frames.jsonl (RGBD adds lossless depth.mkv); state devices write
+stream/state.jsonl. Device unload finishes its capture. A failed device is reported while
+other devices continue; max_mb ends and saves the whole recording.
+
+Recordings live under .kinex/recordings/<id>/. No devices are automatically loaded by this tool.
+
+Capture Hz and playback FPS are independent. Check samples, effectiveHz, skipped
+(missed capture slots), readErrors and stream.transport_dropped for shortfalls.
+Repeated playback frames are not fresh samples. Available capture continues when
+the source cannot sustain the rate; warnings identify the affected device.

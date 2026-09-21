@@ -1,0 +1,43 @@
+{
+  "name": "kinex",
+  "version": "0.5.0",
+  "description": "Standalone robotics coding agent powered by Pi",
+  "type": "module",
+  "bin": {
+    "kinex": "bin/kinex.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "assets",
+    "README.md"
+  ],
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build:core": "node packages/core/script/build.mjs",
+    "build": "node script/build.mjs",
+    "typecheck": "npm run build:core && tsc --noEmit -p tsconfig.json",
+    "dev": "node bin/kinex.mjs",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:core": "npm run build:core && node --test packages/core/test/*.test.mjs",
+    "test:tui": "node --test test/tui.test.mjs"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.86.1",
+    "@earendil-works/pi-coding-agent": "0.86.1",
+    "@earendil-works/pi-tui": "0.86.1",
+    "@kinex/core": "0.5.0",
+    "proper-lockfile": "4.1.2",
+    "typebox": "1.3.27"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "@types/proper-lockfile": "4.1.4",
+    "typescript": "5.9.3"
+  }
+}

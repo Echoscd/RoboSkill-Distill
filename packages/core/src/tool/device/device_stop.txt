@@ -1,0 +1,5 @@
+Immediately stops motion. With no deviceID it stops EVERY loaded actuated device (each
+through its own driver's "stop" action); with a deviceID it stops just that device.
+Never gated behind a permission prompt. The result reports, per device, whether the
+stop actually went through — a device whose driver declares no "stop" action is
+called out loudly, because it may still be moving.

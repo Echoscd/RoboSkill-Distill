@@ -1,0 +1,5 @@
+[project]
+name = "kinex-runtime"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = ["numpy", "scipy", "Pillow", "PyYAML", "opencv-python-headless>=4.7,<5"]

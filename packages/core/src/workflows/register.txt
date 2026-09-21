@@ -1,0 +1,10 @@
+Register a new device for the workspace robot: $ARGUMENTS
+
+Registration prepares its runtime, artifacts, driver and profile with loaded: false.
+It does not start a service or read hardware; the device tool load action or /load activates it.
+If no workspace robot is configured, suggest /onboarding first.
+
+Load the setup-device skill. Follow its instance-first, then type-template lookup
+using the Device guide roots. Read only the selected Setup guide, its starter YAML
+and driver, plus the type's short Use contract. Reuse the user's supplied name and
+facts. Validate the prepared device statically, then report its name and /load.

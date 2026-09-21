@@ -1,0 +1,266 @@
+import { scoped } from "../scope.ts"
+import { spawnProcess } from "../util/process.ts"
+import { pythonRuntime, pythonDiagnostic } from "../python/environment.ts"
+import { abortable } from "../util/abort.ts"
+import path from "node:path"
+import { CalibrationStore } from "../calibration/store.ts"
+import { Assets } from "../installation/assets.ts"
+import { NamedError } from "../util/error.ts"
+import { exists } from "../util/filesystem.ts"
+import { readLine, LineTimeoutError } from "../util/lines.ts"
+import { serveProcess, terminate, type ServeProcess } from "./serve-process.ts"
+import { isModel, type Device } from "./profile/schema.ts"
+
+// Runs the agent-authored per-device drivers (devices/<name>/driver.py). The
+// full contract — argv form, one-JSON-object stdout, the --serve JSON-lines
+// protocol — is the agent-facing prose in builtin/skill/setup-device/SKILL.md;
+// this file is its harness half.
+
+
+class DriverError extends NamedError {
+  constructor(message: string, data: Record<string, unknown> = {}) {
+    super("DriverError", message, data)
+  }
+}
+
+export interface DeviceReading {
+  deviceID: string
+  kind: string
+  // Small payloads inline; large ones (images) written to a file with the path here.
+  data?: Record<string, unknown>
+  filePath?: string
+}
+
+const DRIVER_TIMEOUT_MS = 60_000
+
+// Per-call wall-clock cap; drivers override via access.driver.timeout_s (model
+// services initialize during the load request).
+function timeoutMs(device: Device): number {
+  const seconds = device.access?.driver?.timeout_s
+  return seconds !== undefined ? seconds * 1000 : DRIVER_TIMEOUT_MS
+}
+
+// The driver's absolute entry path, or undefined when the device declares none.
+export async function driverPath(cwd: string, device: Device): Promise<string | undefined> {
+  const driver = device.access?.driver
+  if (!driver) return undefined
+  return path.join(await CalibrationStore.deviceDir(cwd, device.name), driver.entry)
+}
+
+// Declared AND present on disk — what the access:<device> calibration item checks.
+export async function driverExists(cwd: string, device: Device): Promise<boolean> {
+  const file = await driverPath(cwd, device)
+  if (!file) return false
+  return exists(file)
+}
+
+// Shared python helpers live beside the devices: .kinex/lib/ is
+// on PYTHONPATH for every driver, so two drivers talking to one SDK (an arm and
+// its gripper sharing a controller connection) import one module instead of
+// duplicating it. The harness's own python/ rides along for kinex.geometry
+// (pure pose math — the protocol side of the lib stays dialog-gated).
+const pythonDir = () => Assets.python()
+
+async function driverEnv(cwd: string, interpreter?: string, signal?: AbortSignal) {
+  const runtime = await pythonRuntime(cwd, interpreter, signal)
+  const lib = path.join(await CalibrationStore.workspaceDir(cwd), "lib")
+  const paths = [lib, pythonDir(), ...(process.env["PYTHONPATH"] ? [process.env["PYTHONPATH"]] : [])]
+  return { ...runtime, env: { ...runtime.env, PYTHONPATH: paths.join(":") } }
+}
+
+function parsePayload(deviceName: string, line: string | undefined): Record<string, unknown> {
+  if (!line) throw new DriverError(`driver for "${deviceName}" printed nothing on stdout (expected one JSON object)`)
+  const parsed = (() => {
+    try {
+      return JSON.parse(line) as unknown
+    } catch {
+      return undefined
+    }
+  })()
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+    throw new DriverError(`driver stdout is not a JSON object: ${line.slice(0, 200)}`)
+  return parsed as Record<string, unknown>
+}
+
+function toReading(device: Device, payload: Record<string, unknown>, stderr: string, interpreter: string): DeviceReading {
+  if (payload["ok"] === false)
+    throw new DriverError(pythonDiagnostic(`driver for "${device.name}" failed: ${String(payload["error"] ?? "no error message")}`, interpreter), {
+      stderr: stderr.trim(),
+    })
+  const { ok: _ok, file: filePath, ...data } = payload
+  if (isModel(device) && filePath !== undefined && typeof filePath !== "string")
+    throw new DriverError(`model "${device.name}" returned a non-string file path`)
+  return {
+    deviceID: device.name,
+    kind: device.type,
+    ...(typeof filePath === "string" ? { filePath } : {}),
+    ...(Object.keys(data).length > 0 ? { data } : {}),
+  }
+}
+
+// --- persistent (--serve) drivers -----------------------------------------
+
+interface DriverProcess extends ServeProcess { interpreter: string; loaded?: boolean }
+const serving = scoped(() => new Map<string, DriverProcess>())
+
+export async function isServing(cwd: string, deviceName: string): Promise<boolean> {
+  const entry = serving().get(await CalibrationStore.deviceDir(cwd, deviceName))
+  return entry !== undefined && entry.stopping === undefined && entry.proc.exitCode === null
+}
+
+// The /unload half of the lifecycle: close stdin and await exit (no-op when none).
+export async function stopServing(cwd: string, deviceName: string): Promise<void> {
+  const key = await CalibrationStore.deviceDir(cwd, deviceName)
+  const entry = serving().get(key)
+  if (!entry) return
+  await terminate(entry, true)
+  if (serving().get(key) === entry) serving().delete(key)
+}
+
+async function serveLine(entry: ServeProcess, timeoutMs: number): Promise<string> {
+  const line = await readLine(entry.source, Date.now() + timeoutMs).catch((error: unknown) => {
+    if (error instanceof LineTimeoutError) throw new DriverError("persistent driver timed out")
+    throw error
+  })
+  if (line === undefined) throw new DriverError("persistent driver closed its stdout")
+  return line
+}
+
+async function runServe(
+  cwd: string,
+  device: Device,
+  file: string,
+  action: string,
+  args: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<DeviceReading> {
+  const key = await CalibrationStore.deviceDir(cwd, device.name)
+  const entry = await (async () => {
+    const existing = serving().get(key)
+    if (existing?.stopping) await existing.stopping
+    if (existing && !existing.stopping && existing.proc.exitCode === null) return existing
+    if (action !== "load") throw new DriverError(`device "${device.name}" is inactive; load it before ${action}`)
+    if (existing) await terminate(existing)
+    const runtime = await driverEnv(cwd, device.access?.driver?.interpreter, signal)
+    signal?.throwIfAborted()
+    const proc = spawnProcess([runtime.executable, file, "--serve"], {
+      cwd: path.dirname(file),
+      group: true,
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: runtime.env,
+    })
+    const created: DriverProcess = { ...serveProcess(proc), interpreter: runtime.executable }
+    serving().set(key, created)
+    return created
+  })()
+  if (action !== "load" && action !== "unload" && !entry.loaded)
+    throw new DriverError(`device "${device.name}" is not ready; load it before ${action}`)
+  const abort = () => {
+    void terminate(entry)
+  }
+  signal?.addEventListener("abort", abort, { once: true })
+  const payload = await (async () => {
+    signal?.throwIfAborted()
+    entry.proc.stdin.write(JSON.stringify({ action, args }) + "\n")
+    await abortable(Promise.resolve(entry.proc.stdin.flush()), signal)
+    return abortable(serveLine(entry, timeoutMs(device)), signal)
+  })()
+    .then((line) => parsePayload(device.name, line))
+    .catch(async (error: unknown) => {
+      await terminate(entry)
+      if (serving().get(key) === entry) serving().delete(key)
+      if (signal?.aborted) throw error
+      throw new DriverError(pythonDiagnostic(`driver for "${device.name}" failed: ${error instanceof Error ? error.message : String(error)}\n${entry.stderr.tail.trim()}`, entry.interpreter), { stderr: entry.stderr.tail.trim() })
+    }).finally(() => signal?.removeEventListener("abort", abort))
+  try {
+    signal?.throwIfAborted()
+    const reading = toReading(device, payload, entry.stderr.tail, entry.interpreter)
+    if (action === "load") entry.loaded = true
+    return reading
+  } catch (error) {
+    if (action === "load") await stopServing(cwd, device.name)
+    throw error
+  }
+}
+
+// --- one-shot drivers ------------------------------------------------------
+
+export async function runDriver(
+  cwd: string,
+  device: Device,
+  action: string,
+  args: Record<string, unknown> = {},
+  signal?: AbortSignal,
+): Promise<DeviceReading> {
+  signal?.throwIfAborted()
+  const driver = device.access?.driver
+  if (!driver) throw new DriverError(`device "${device.name}" declares no access.driver`)
+  const active = driver.persistent && await isServing(cwd, device.name)
+  if (action === "status" && !active)
+    return { deviceID: device.name, kind: device.type, data: { loaded: device.loaded, ready: false, serving: false, persistent: driver.persistent } }
+  if (action === "unload" && !(driver.persistent ? active : device.loaded)) {
+    await stopServing(cwd, device.name)
+    return { deviceID: device.name, kind: device.type, data: { unloaded: true } }
+  }
+  if (action === "load") {
+    const missing = ["load", "unload", "status"].filter(action => !driver.actions.includes(action))
+    if (missing.length) throw new DriverError(`device "${device.name}" driver lacks lifecycle actions: ${missing.join(", ")}`)
+  }
+  const file = await driverPath(cwd, device)
+  if (!file || (!active && !(await exists(file))))
+    throw new DriverError(`device "${device.name}" declares driver ${driver.entry} but ${file} does not exist`)
+  try {
+    return driver.persistent ? await runServe(cwd, device, file, action, args, signal) : await runOnce(cwd, device, file, action, args, signal)
+  } finally {
+    if (action === "unload") await stopServing(cwd, device.name)
+  }
+}
+
+async function runOnce(
+  cwd: string,
+  device: Device,
+  file: string,
+  action: string,
+  args: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<DeviceReading> {
+  const runtime = await driverEnv(cwd, device.access?.driver?.interpreter, signal)
+  signal?.throwIfAborted()
+  const proc = spawnProcess([runtime.executable, file, action, JSON.stringify(args)], {
+    cwd: path.dirname(file),
+    group: true,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: runtime.env,
+  })
+  const abort = () => proc.kill()
+  signal?.addEventListener("abort", abort, { once: true })
+  if (signal?.aborted) abort()
+  const timeout = setTimeout(abort, timeoutMs(device))
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]).finally(() => {
+    proc.kill("SIGKILL")
+    clearTimeout(timeout)
+    signal?.removeEventListener("abort", abort)
+  })
+  signal?.throwIfAborted()
+  if (code !== 0)
+    throw new DriverError(pythonDiagnostic(`driver for "${device.name}" exited ${code}: ${stderr.trim().slice(0, 500)}`, runtime.executable), { code })
+
+  const line = stdout
+    .split("\n")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .at(-1)
+  return toReading(device, parsePayload(device.name, line), stderr, runtime.executable)
+}
+
+export async function closeDrivers(): Promise<void> {
+  await Promise.allSettled([...serving().values()].map((entry) => terminate(entry, true)))
+  serving().clear()
+}

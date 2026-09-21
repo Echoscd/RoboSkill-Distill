@@ -1,0 +1,83 @@
+import { parseArgs } from "node:util"
+import { InteractiveMode, runPrintMode } from "@earendil-works/pi-coding-agent"
+import { createApplication } from "./application.ts"
+import { executeRoboticsCommand } from "@kinex/core"
+
+const help = `Kinex — robotics coding agent
+
+kinex [options]                       Interactive terminal
+kinex run [options] "prompt"          Run once; prints the final reply
+kinex run "/devices"                  Direct robotics command; no model needed
+
+--model provider/model               Select a Pi model/provider
+--thinking off|minimal|low|medium|high|xhigh
+--continue                           Continue the latest workspace session
+--session <id|file>                   Open a Kinex SDK session
+--auto                               Approve tool permissions; keep interviews
+--yolo                               Approve permissions; disable interviews
+--enable-recording                   Expose recording controls to the model
+--record "arm=10 camera=2"            Record during a headless run
+--seed "prompt"                      Submit after interactive startup
+--json                               Headless SDK events as JSON lines
+
+TUI: /load /unload /reload <device> /ping /stop /devices /record
+     /onboarding /register /calibrate /mode /model /login /new /compact
+Bare /reload refreshes agent resources. Python/uv remain external dependencies.
+`
+
+async function main(): Promise<void> {
+  const { values, positionals } = parseArgs({ allowPositionals: true, strict: true, options: {
+    help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" },
+    model: { type: "string" }, thinking: { type: "string" }, effort: { type: "string" },
+    continue: { type: "boolean" }, session: { type: "string" }, auto: { type: "boolean" }, yolo: { type: "boolean" },
+    "enable-recording": { type: "boolean" }, record: { type: "string" }, seed: { type: "string" }, json: { type: "boolean" },
+  } })
+  if (values.help) { console.log(help); return }
+  if (values.version) { console.log("0.5.0"); return }
+  if (values.auto && values.yolo) throw new Error("Choose --auto or --yolo")
+  const thinking = values.thinking ?? values.effort
+  if (thinking !== undefined && thinking !== "off" && thinking !== "minimal" && thinking !== "low" && thinking !== "medium" && thinking !== "high" && thinking !== "xhigh") throw new Error("Invalid thinking level")
+  const headless = positionals[0] === "run"
+  if (!headless && positionals.length) throw new Error("Use kinex run <prompt> or --seed <prompt>")
+  const prompt = positionals.slice(1).join(" ")
+  if (headless && !prompt) throw new Error("Usage: kinex run <prompt>")
+  if (!headless && (values.json || values.record)) throw new Error("--json and --record require kinex run")
+  const app = await createApplication({
+    cwd: process.cwd(), model: values.model, thinkingLevel: thinking,
+    mode: values.yolo ? "yolo" : values.auto ? "auto" : "ask",
+    enableRecording: values["enable-recording"], continue: values.continue, session: values.session,
+    report: text => { if (!values.json) console.log(text) },
+  })
+  let interactive: InteractiveMode | undefined
+  const shutdown = () => {
+    void app.dispose().then(() => { interactive?.stop(); process.exit(130) }, error => {
+      interactive?.stop(); console.error(String(error)); process.exit(1)
+    })
+  }
+  process.once("SIGINT", shutdown)
+  try {
+    if (headless) {
+      if (values.record && app.owner.runtime) {
+        await Promise.all((await app.owner.runtime.devices.warmLoaded()).map(activation => activation.ready))
+        await executeRoboticsCommand(app.owner.runtime, "record", `start ${values.record}`, {
+          sessionID: app.host.session.sessionId, confirm: async () => false,
+        })
+      }
+      process.exitCode = await runPrintMode(app.host, {
+        mode: values.json ? "json" : "text",
+        initialMessage: prompt,
+      })
+      if (app.owner.failure) process.exitCode = 1
+    } else {
+      if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("Interactive Kinex needs a terminal; use kinex run <prompt>")
+      interactive = new InteractiveMode(app.host, { initialMessage: values.seed })
+      await interactive.run()
+    }
+  } finally {
+    process.off("SIGINT", shutdown)
+    await app.dispose()
+  }
+}
+
+try { await main() }
+catch (error) { console.error(`Kinex: ${error instanceof Error ? error.message : String(error)}`); process.exitCode = 1 }

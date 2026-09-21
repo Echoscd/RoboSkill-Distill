@@ -1,0 +1,207 @@
+"""Call-local frame forests with optional estimated bridges and lazy live reads."""
+
+import math
+
+from kinex import device, fail, profile
+from kinex.frame_path import Edge, compose_path, label, select_path
+from kinex.geometry import mount_to_rt, pose_to_rt, rt_to_pose, xyzq_to_rt
+from kinex.validation import vector
+
+
+def _missing(value):
+    return value is None or value == "???"
+
+
+class _FrameError(ValueError):
+    """Missing topology, which can be irrelevant above the requested path."""
+
+
+class _Resolver:
+    """Each profile, declared edge, transform and device sample is cached per call."""
+
+    def __init__(self, readings):
+        self.profiles = {}
+        self.readings = dict(readings or {})
+        self.parents = {}
+        self.ends = {}
+
+    def profile(self, name):
+        if name not in self.profiles:
+            self.profiles[name] = profile(name, optional=True)
+        prof = self.profiles[name]
+        if prof is not None:
+            return prof
+        if name == "world":
+            return {"type": "world", "intrinsics": {"frames": {}}}
+        raise _FrameError(f'no device "{name}" in the frame graph')
+
+    def read(self, name):
+        if name not in self.readings:
+            self.readings[name] = device(name).get("data") or {}
+        return self.readings[name]
+
+    def node(self, ref):
+        if not isinstance(ref, str) or not ref:
+            raise _FrameError("provide a nonempty frame reference")
+        name, _, frame = ref.partition(":")
+        frame = "" if frame == name else frame
+        prof = self.profile(name)
+        if prof.get("type") in ("model", "detection", "segmentation"):
+            raise _FrameError(f'"{name}" is a model device — it has no physical pose')
+        if frame and frame not in prof.get("intrinsics", {}).get("frames", {}):
+            raise _FrameError(f'device "{name}" does not declare frame "{frame}"')
+        return name, frame
+
+    def frame_pose(self, node):
+        name, frame = node
+        value = self.read(name).get("frame_poses", {}).get(frame)
+        if value is None:
+            fail(f'device "{name}" reported no pose for {label(node)}')
+        return xyzq_to_rt(value)
+
+    def measured_pose(self, name):
+        value = self.read(name).get("pose")
+        if not isinstance(value, dict):
+            fail(f'device "{name}" reported no measured pose')
+        return pose_to_rt({"translation": value["translation_m"], "rotation": value["rotation_xyzw"]})
+
+    def parent_edge(self, node):
+        name, frame = node
+        prof = self.profile(name)
+        if frame:
+            fixed = prof["intrinsics"]["frames"][frame]
+            if fixed == "???":
+                return Edge(node, (name, ""), "static", None, f"intrinsics:{name} frame {frame} is ??? — run calib_plan")
+            if fixed is None:
+                return Edge(node, (name, ""), "live", lambda: self.frame_pose(node))
+            return Edge(node, (name, ""), "static", lambda: xyzq_to_rt(fixed))
+        if prof.get("type") == "world":
+            return None
+        spatial = prof.get("extrinsics") or {}
+        velocity = prof.get("type") == "velocity"
+        if velocity or "pose_frame" in spatial:
+            feedback = prof["intrinsics"].get("feedback") if velocity else spatial
+            reference = feedback.get("pose_frame") if isinstance(feedback, dict) else "???"
+            if _missing(reference):
+                section = "intrinsics" if velocity else "extrinsics"
+                raise _FrameError(f"{name} is unlocalized" if reference is None else f"{section}:{name} pose_frame is ???")
+            return Edge(node, self.node(reference), "dynamic", lambda: self.measured_pose(name))
+        mount = spatial.get("mount")
+        if _missing(mount):
+            raise _FrameError(f"extrinsics:{name} mount is unknown — run calib_plan")
+        parent = self.node(f"{mount['parent']}:{mount['parent_frame']}")
+        if any(_missing(mount.get(key)) for key in ("translation_m", "rotation_xyzw")):
+            return Edge(node, parent, "static", None, f"extrinsics:{name} mount is incomplete — run calib_plan")
+        return Edge(node, parent, "static", lambda: mount_to_rt(mount))
+
+    def discover(self, ref):
+        try:
+            start = node = self.node(ref)
+        except _FrameError as error:
+            fail(str(error))
+        seen = set()
+        while True:
+            if node in seen:
+                fail(f"frame cycle at {label(node)} — fix the pose references")
+            if node in self.parents:
+                return start
+            seen.add(node)
+            try:
+                edge = self.parent_edge(node)
+            except _FrameError as error:
+                self.ends[node] = str(error)
+                edge = None
+            self.parents[node] = edge
+            if edge is None:
+                return start
+            node = edge.parent
+
+    def ancestors(self, node):
+        while True:
+            yield node
+            edge = self.parents[node]
+            if edge is None:
+                return
+            node = edge.parent
+
+    def disconnected(self, nodes):
+        reasons = {}
+        for node in nodes:
+            for ancestor in self.ancestors(node):
+                edge = self.parents[ancestor]
+                reason = edge.reason if edge is not None else self.ends.get(ancestor)
+                if reason:
+                    reasons[reason] = None
+        detail = f" — {'; '.join(reasons)}" if reasons else ""
+        fail(f"no usable frame path connects {', '.join(map(label, nodes))}{detail}")
+
+    def estimates(self, estimates):
+        if not isinstance(estimates, list):
+            raise ValueError("estimates must be an array")
+        edges = []
+        for index, estimate in enumerate(estimates):
+            prefix = f"estimates[{index}]"
+            if not isinstance(estimate, dict) or set(estimate) != {"child", "parent", "translation_m", "rotation_xyzw"}:
+                raise ValueError(f"{prefix} needs child, parent, translation_m and rotation_xyzw")
+            translation = vector(estimate["translation_m"], 3, f"{prefix}.translation_m")
+            rotation = vector(estimate["rotation_xyzw"], 4, f"{prefix}.rotation_xyzw")
+            if abs(math.hypot(*rotation) - 1) >= 1e-6:
+                raise ValueError(f"{prefix}.rotation_xyzw must be a unit quaternion")
+            child, parent = (self.discover(estimate[key]) for key in ("child", "parent"))
+            rt = pose_to_rt({"translation": translation, "rotation": rotation})
+            edges.append(Edge(child, parent, "estimated", lambda rt=rt: rt, estimate_index=index))
+        return edges
+
+
+def common_frame(refs, *, readings=None):
+    """Find the deepest common ancestor, or highest calibrated ancestor of one ref.
+
+    Returns {frame, transforms, chains}, with directed provenance in each chain.
+    Unknown edges above the selected ancestor are irrelevant; required live reads
+    must succeed. Estimated bridges belong to pose(), which has an explicit target.
+    """
+    if not refs:
+        fail("provide at least one frame reference")
+    resolver = _Resolver(readings)
+    nodes = [resolver.discover(ref) for ref in refs]
+    if len(nodes) == 1:
+        target = nodes[0]
+        while (edge := resolver.parents[target]) is not None and edge.resolve is not None:
+            target = edge.parent
+    else:
+        chains = [list(resolver.ancestors(node)) for node in nodes]
+        shared = set(chains[0]).intersection(*chains[1:])
+        target = next((node for node in chains[0] if node in shared), None)
+        if target is None:
+            resolver.disconnected(nodes)
+    transforms, chains = [], []
+    for node in nodes:
+        path = []
+        while node != target:
+            edge = resolver.parents[node]
+            path.append((edge, False))
+            node = edge.parent
+        rt, used = compose_path(path)
+        transforms.append(rt)
+        chains.append(used)
+    return {"frame": label(target), "transforms": transforms, "chains": chains}
+
+
+def pose(child, parent, *, readings=None, estimates=None):
+    """Child expressed in parent: p_parent = R * p_child + t, quaternion xyzw.
+
+    Returns translation, rotation, ordered path and estimated_links. Call-local
+    estimates use child, parent, translation_m and unit rotation_xyzw. Paths prefer
+    fewer estimates, then fewer edges, with direction-independent ties. Each path
+    entry has from, to, kind and inverse, plus estimate_index for supplied links.
+    Only the chosen path reads devices; read failures remain errors.
+    """
+    resolver = _Resolver(readings)
+    child, parent = resolver.discover(child), resolver.discover(parent)
+    extra = resolver.estimates([] if estimates is None else estimates)
+    edges = [edge for edge in resolver.parents.values() if edge is not None]
+    path = select_path(edges + extra, child, parent)
+    if path is None:
+        resolver.disconnected([child, parent])
+    rt, used = compose_path(path)
+    return {**rt_to_pose(rt), "path": used, "estimated_links": sum(edge.kind == "estimated" for edge, _ in path)}

@@ -1,0 +1,70 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RELEASE_DIR: ${{ runner.temp }}/kinex-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tag must match standalone and core versions
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          const read = path => JSON.parse(readFileSync(path, 'utf8'))
+          const standalone = read('package.json')
+          const core = read('packages/core/package.json')
+          assert.equal(process.env.GITHUB_REF_NAME, `v${standalone.version}`)
+          assert.equal(core.version, standalone.version)
+          assert.equal(standalone.dependencies['@kinex/core'], core.version)
+          JS
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:core
+      - run: npm test
+      - name: Pack standalone and core
+        run: |
+          mkdir -p "$RELEASE_DIR"
+          npm pack ./packages/core --pack-destination "$RELEASE_DIR"
+          npm pack --pack-destination "$RELEASE_DIR"
+          cd "$RELEASE_DIR"
+          sha256sum *.tgz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kinex-packages
+          path: ${{ env.RELEASE_DIR }}/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: kinex-packages
+          path: dist/releases
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" \
+            --generate-notes dist/releases/*.tgz dist/releases/SHA256SUMS
