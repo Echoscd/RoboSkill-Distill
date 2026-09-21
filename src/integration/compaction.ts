@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises"
 import { sessionEntryToContextMessages, type AgentSession } from "@earendil-works/pi-coding-agent"
-import type { contextUpdate } from "./context.ts"
+import type { contextUpdate } from "@kinex/pi/context"
 
 type ContextMessage = NonNullable<Awaited<ReturnType<typeof contextUpdate>>["message"]>
 

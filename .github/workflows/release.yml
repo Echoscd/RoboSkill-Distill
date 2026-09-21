@@ -22,29 +22,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Tag must match standalone and core versions
-        run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict'
-          import { readFileSync } from 'node:fs'
-          const read = path => JSON.parse(readFileSync(path, 'utf8'))
-          const standalone = read('package.json')
-          const core = read('packages/core/package.json')
-          assert.equal(process.env.GITHUB_REF_NAME, `v${standalone.version}`)
-          assert.equal(core.version, standalone.version)
-          assert.equal(standalone.dependencies['@kinex/core'], core.version)
-          JS
+      - name: Check all package versions and internal dependencies
+        run: node script/release.mjs --check --tag "$GITHUB_REF_NAME"
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:core
       - run: npm test
-      - name: Pack standalone and core
-        run: |
-          mkdir -p "$RELEASE_DIR"
-          npm pack ./packages/core --pack-destination "$RELEASE_DIR"
-          npm pack --pack-destination "$RELEASE_DIR"
-          cd "$RELEASE_DIR"
-          sha256sum *.tgz > SHA256SUMS
+      - run: npm run test:adapters
+      - name: Pack standalone, core and adapters
+        run: node script/release.mjs "$RELEASE_DIR" --tag "$GITHUB_REF_NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: kinex-packages

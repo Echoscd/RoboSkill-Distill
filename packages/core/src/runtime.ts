@@ -112,9 +112,9 @@ export function createKinexRuntime(options: RuntimeOptions) {
       })),
       list: () => operation(() => CalibrationStore.listDevices(directory)),
       templates: () => operation(() => listDeviceTemplates(directory)),
-      load: (name: string) => operation(() => activation(loadDevice(directory, name, abort.signal))),
+      load: (name: string, signal?: AbortSignal) => operation(() => activation(loadDevice(directory, name, signal ? AbortSignal.any([abort.signal, signal]) : abort.signal))),
       unload: (name: string) => operation(() => unloadDevice(directory, name)),
-      reload: (name: string) => operation(() => activation(reloadDevice(directory, name, abort.signal))),
+      reload: (name: string, signal?: AbortSignal) => operation(() => activation(reloadDevice(directory, name, signal ? AbortSignal.any([abort.signal, signal]) : abort.signal))),
       ping: (name: string) => operation(() => pingDevice(directory, name)),
       unregister: (name: string) => operation(() => unregisterDevice(directory, name)),
       dispatch: (name: string, action: string, args: Record<string, unknown> = {}, signal?: AbortSignal) => operation(async () => {

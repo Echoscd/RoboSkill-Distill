@@ -1,16 +1,44 @@
-# Kinex standalone
+# Kinex
 
-Read README.md for usage and DESIGN.md for ownership. Update PLAN.md with actual
-progress and validation results.
+Read [DESIGN.md](DESIGN.md) for contracts, [README.md](README.md) for usage and
+[PLAN.md](PLAN.md) for current work. Keep progress current; design history belongs
+in git.
 
-- Core owns robotics and shipped assets, and must not depend on Pi or a UI.
-- Standalone composes published Pi SDKs using public APIs. Do not copy/fork the
-  upstream provider, agent loop, coding tools, sessions, compaction or TUI.
-- Keep user-command execution separate from permission-checked model tools.
-- Preserve cancellation, loaded-device restoration, recording opt-in and disposal.
-- Keep ordinary shell Python independent of lazy `.kinex/python`.
-- Use TypeScript ESM, Node APIs, npm, small modules and typed errors.
-- Run `npm run typecheck`, `npm test` and `npm run test:core` for integration changes.
-  Builds replace output; never rebuild core concurrently with consumer tests.
-- Plugin packaging is a later phase in ../kinex_plugins. Do not publish packages
-  as part of routine build/test work.
+## Ownership
+
+- `packages/core/src` owns robotics; `packages/core/assets` owns shipped Python,
+  tools, skills and device guides. Core must not import a host agent or UI.
+- `src` composes standalone with published Pi SDKs; `src/integration` owns its
+  product policy. Do not fork/reimplement providers, coding tools, loops or TUI.
+- `packages/pi` and `packages/opencode` are out of scope unless the user explicitly
+  requests changes to them. When changing Kinex functionality, do not consider
+  these plugins' requirements, assess their compatibility, or modify their code,
+  manifests or tests. Do not constrain core/standalone changes to preserve plugin
+  compatibility. The user will request plugin adaptation separately when needed.
+
+## Invariants
+
+- Preserve workspace discovery precedence and lazy `.kinex/python`; do not
+  activate core Python in ordinary shells or create it during discovery.
+- Separate trusted commands from permission-checked model tools. Python tools
+  cannot change device lifecycle; model recording remains opt-in.
+- Preserve initialization ordering, cancellation, recording ownership and disposal.
+  Use the owned process helper for core subprocesses; never terminate borrowed
+  services. Retain the control/calibration contracts in DESIGN.md.
+- Keep dynamic state out of stable prompt prefixes. Refresh capabilities within
+  tasks and restore context after compaction without bypassing host permissions.
+
+## Style and checks
+
+TypeScript ESM, Node APIs, npm and Zod v4. Prefer small functions, named imports,
+early returns and async/await. Avoid `any`, unnecessary casts/catches and obsolete
+compatibility layers; retain typed errors (`NamedError`). Imported prose belongs
+in sibling `.txt` files; discovered content belongs in core assets.
+
+- Integration: `npm run typecheck`, `npm test`, `npm run test:core`.
+- Build/package: `npm run build`, then `npm run pack -- OUTPUT_DIRECTORY`.
+
+Builds replace output: never rebuild packages concurrently with consumer tests.
+Use Node >=22.19 and Python 3 for POSIX PTY tests. Release work follows README.md;
+routine builds/tests do not publish packages.
+Documentation-only changes need link/diff checks, not a full test run.

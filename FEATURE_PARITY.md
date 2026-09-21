@@ -2,7 +2,7 @@
 
 审计时间：2026-09-21。旧版为重构前 Kinex commit `1968e57`，新版为本仓库当前源码及实际安装的 Pi 0.86.1。旧证据路径指向历史仓库，新证据路径相对本仓库。第三方 Pi 包不在范围内；用户自己的 Kinex workspace 工具、skills、commands 在范围内。
 
-这是源码功能盘点，不是所有功能的运行验收。最近完整验证为类型检查通过、46/46 项 standalone 测试、15/15 项 core 测试；其中 13 项覆盖 context/cache/热加载，14 项覆盖批次拒绝/取消/恢复、纯 coding 并行，以及手动/阈值/overflow 压缩、摘要重试/失败/取消、首次请求状态恢复。此前复现的拒绝 core 操作后兄弟工具仍执行问题已修复并加入回归。本轮修改仅在 standalone 的 Pi 适配层，core 实现/API 未改变；没有调用真实 provider 或硬件。缓存请求结构验证详见 [CONTEXT_AUDIT.md](CONTEXT_AUDIT.md)，不能当作真实 cache-hit 测量。
+这是源码功能盘点，不是所有功能的运行验收。最近完整验证为类型检查通过、46/46 项 standalone 测试、16/16 项 core 测试、14/14 项 native adapter 测试；其中 13 项覆盖 context/cache/热加载，14 项覆盖批次拒绝/取消/恢复、纯 coding 并行，以及手动/阈值/overflow 压缩、摘要重试/失败/取消、首次请求状态恢复。此前复现的拒绝 core 操作后兄弟工具仍执行问题已修复并加入回归。v0.6.0 新增宿主无关的 contribution API 和 Pi/OpenCode adapters；core 命令增加取消信号，机器人业务逻辑仍由 core 持有。没有调用真实 provider 或硬件。缓存请求结构验证详见 [CONTEXT_AUDIT.md](CONTEXT_AUDIT.md)，不能当作真实 cache-hit 测量。
 
 状态：**保留** = core/适配层已接入；**Pi** = 新版实际使用的 Pi 功能；**变化** = 能力存在但入口、行为或完整程度不同；**未接入** = Pi 有基础能力但新版未连接；**缺失** = 当前无对应实现。Pi 有底层 API 不代表 Kinex CLI 已暴露该能力。
 
@@ -27,7 +27,7 @@
 | `kinex stats [--json]` | 缺失 | Pi 有当前会话统计，没有接入旧跨会话聚合。 |
 | `kinex upgrade [version]` | 缺失 | 源码/npm 构建交付，没有自更新命令。 |
 | `--log-level` / `KINEX_LOG_LEVEL` | 变化 | 无统一 CLI 日志选项；复制的 core 自身日志设施仍存在，不能当作整个新 harness 的日志控制。 |
-| help/version、错误退出码 | 保留 | 新版 CLI 自行处理；版本为 0.5.0。 |
+| help/version、错误退出码 | 保留 | 新版 CLI 自行处理；版本为 0.6.0。 |
 
 旧证据：`src/index.ts`、`src/cli/cmd/*`、`src/cli/chat.ts`。新证据：`src/cli.ts`。
 
@@ -69,7 +69,7 @@
 | 稳定 system/tool 前缀、变化状态作为历史消息 | 保留 | Kinex snapshot 仅追加变化；Pi 支持的 Responses/Completions/Anthropic 动态工具协议已做本地请求验证。新增工具不一定改变旧前缀；不支持的模型、接口重定义及部分删除路径会回退，不能保证永久命中。真实 cache hit 未测。 |
 | 每个模型 step 更新设备/Python/录制/发现错误上下文 | 保留 | before_agent_start 和 turn_end 追加变化状态；通过公开的下一轮准备 hook 同步到运行中的 Pi loop，无需新用户 prompt。 |
 | 每个 step 重扫新工具/schema | 保留 | 每批工具完成后刷新新增、修改、删除及发现错误；headless 下一次模型请求可调用新工具。已有工具代码仍由 core 调用时重载。 |
-| 给模型的工具发现说明 | 变化／待修正 | 运行代码已支持任务内热加载，但 `src/integration/instructions.txt` 仍称新工具要等下一条 prompt/reload，并建议当前任务用 bash 测试。说明与实现冲突，应立即同步。 |
+| 给模型的工具发现说明 | 保留 | 已同步说明：完整工具批次结束后、下一次模型请求可见；同批调用之间不保证新增工具可用。 |
 | 压缩后的状态补全 | 保留 | session_compact 提交后立即读取、持久化并同步完整 snapshot，首次后续请求可见；已验证手动、任务内阈值及 overflow 自动恢复。恢复失败则中止并阻止后续模型请求，成功刷新后才恢复。 |
 | OpenAI 原始响应/推理状态、多 provider 规范化回放 | Pi | 使用 Pi provider-specific 处理；不保留旧 responseState 格式，也未逐 provider 验证完全等价。 |
 | 图片不可变回放 | 保留 | 新版将 base64 图片持久化进 Pi transcript，已测试源文件替换及 resume。 |
@@ -80,7 +80,7 @@
 | 旧 session/auth/TUI KV 状态迁移 | 缺失 | 第一阶段明确不迁移；机器人 workspace 仍兼容。 |
 | 会话间设备连接/录制归属 | 保留 | 同 cwd 切换聊天保留连接、停止当前录制；换 cwd/退出 dispose。 |
 
-旧证据：`src/session/loop.ts`、`runner.ts`、`compact.ts`、`attachment.ts`、`src/integration/kinex/prompt.ts`、`compaction.txt`。新证据：`src/integration/context.ts`、`tools.ts`、`owner.ts`、`extension.ts`。
+旧证据：`src/session/loop.ts`、`runner.ts`、`compact.ts`、`attachment.ts`、`src/integration/kinex/prompt.ts`、`compaction.txt`。新证据：`packages/pi/src/context.ts`、`tools.ts`、`owner.ts` 及 `src/integration/extension.ts`。
 
 ## 4. 工具、权限与交互
 
@@ -110,7 +110,7 @@
 
 ## 5. Core 与机器人集成
 
-本轮重新文件对比：旧 core 的 104 个 src 文件均存在且内容保持（index.ts 仅扩展导出）；新增 commands.ts。排除 Python 生成的 __pycache__/pyc 后，81 个 assets 文件逐字一致，3 个 core test 文件一致。下列“保留”指源码和接入保留，不代表所有真实设备重新验收过。
+v0.5.0 迁移审计确认旧 core 的 104 个 src 文件、81 个 assets 文件和 3 个测试文件保留。v0.6.0 在此基础上增加 integration.ts contribution 合同及测试，commands.ts/runtime.ts 增加命令取消信号；本轮没有重写设备算法或 assets。下列“保留”指源码和接入保留，不代表所有真实设备重新验收过。
 
 | 原功能 | 状态 | 当前实现及差异 |
 | --- | --- | --- |
@@ -175,9 +175,9 @@
 | cache-audit 离线和可选真实 provider 测量 | 变化 | 已有实际 SDK 请求捕获，覆盖三种协议、五种兼容配置、动态追加/删除/重定义及会话恢复。旧独立审计 CLI、真实 provider hit rate 和跨会话聚合尚未接入。 |
 | 自包含 Node release、校验、launcher 原子切换 | 缺失 | 当前独立源码/npm 包；需要用户的 Node >=22.19。 |
 | curl installer、自更新、多平台二进制 release CI | 缺失 | 尚无旧 installer/自包含 Node 多平台构建；npm 发布流程见下一行。 |
-| GitHub CI / tag 发布流程 | 变化 | 新增 Linux Node 22.19 类型检查、core/standalone（含 PTY/安装迁移）测试；v* tag 校验版本后生成两个 npm tarball 和 SHA256SUMS 并创建 GitHub Release，不发布 npm registry。工作流本地检查通过，尚未在 GitHub runner 执行。 |
-| 独立 npm 打包/资产/移动安装后运行 | 保留 | core 和 standalone tarball 独立安装迁移已验证。 |
-| 验证覆盖 | 变化 | 旧 PLAN 记录 371 source tests、Node/PTY/RoboEnv/release 验证；新 46+15 测试不能声称等价覆盖。原 test/ 下的领域算法及 RoboEnv 测试尚未迁到新工程，core/package 自带 3 个文件已保留。 |
+| GitHub CI / tag 发布流程 | 变化 | 新增 Linux Node 22.19 类型检查、core/standalone/native adapters（含真实宿主、PTY/安装迁移）测试；v* tag 校验版本和内部依赖后生成四个 npm tarball 和 SHA256SUMS 并创建 GitHub Release，不发布 npm registry。工作流本地检查通过，尚未在 GitHub runner 执行。 |
+| 独立 npm 打包/资产/移动安装后运行 | 保留 | core、Pi、OpenCode、standalone 四个 tarball 已验证；standalone 不依赖 OpenCode，adapters 不依赖 standalone。 |
+| 验证覆盖 | 变化 | 旧 PLAN 记录 371 source tests、Node/PTY/RoboEnv/release 验证；新 46+16+14 测试不能声称等价覆盖。原 test/ 下的领域算法及 RoboEnv 测试尚未迁到新工程，core/package 自带 3 个文件已保留。 |
 
 旧证据：`src/cli/cmd/{export,stats,upgrade}.ts`、`src/session/export.ts`、`src/provider/{usage,diagnostics}.ts`、`script/cache-audit.mjs`、`script/release.mjs`、`install`、`PLAN.md`。
 
@@ -207,11 +207,11 @@
 
 ## 10. 优先级：哪些必须先补
 
-按正确性和任务能否独立完成排序，不按旧版功能数量排序。运行内 context/schema 刷新和下列两个 P0 已完成；其余建议仍未实施。
+按正确性和任务能否独立完成排序，不按旧版功能数量排序。运行内 context/schema 刷新、热加载说明和下列两个 P0 已完成；P1 建议仍未实施。
 
-### 立即修正：热加载说明与实际行为冲突
+### 已修正：热加载说明
 
-`src/integration/instructions.txt` 仍告诉模型新工具要等下次 prompt/reload。这会误导模型绕开刚实现的原生工具发现。将其改成“完整批次结束后、下一次模型请求可见”，同时说明同批调用之间不保证新增工具可用。现有 headless 热加载测试应检查提示说明，避免再次出现代码和指令脱节。
+`src/integration/instructions.txt` 已说明“完整批次结束后、下一次模型请求可见”，并明确同批调用之间不保证新增工具可用。Pi/OpenCode adapter 各自说明其发现入口。
 
 ### 两个 P0：已实现并验证
 
@@ -220,7 +220,7 @@
 | core 工具批次顺序、权限拒绝和取消语义 | 使用 Pi sequential 元数据，让含 core/question 的整批按序执行；纯 coding 保持并行。保留原权限、取消和 disposal。 | 设备/校准/Python controller 拒绝、question 取消、运行中取消不启动后续调用；已完成工作保留；热加载工具也保序；正常继续和重开会话可恢复；纯 coding rendezvous 验证并行。 |
 | compaction 保留机器人事实，并在首次后续请求恢复最新状态 | 使用公开压缩事件、stream function 和 SessionManager API；临时摘要规则只作用于压缩请求，提交后立即持久化并同步完整 core snapshot。 | 手动、任务内阈值和 overflow 首次后续请求包含最新状态；用户 focus 保留；摘要重试/失败/取消无规则泄漏或重复 snapshot；状态恢复失败时停止，重新成功刷新后继续。 |
 
-证据：`src/integration/tools.ts`、`extension.ts`、`compaction.ts`、`compaction.txt`、`application.ts` 和 `test/p0.test.mjs`。这两个保证属于 standalone Pi 适配层，其他 harness 仅安装 core 不会自动继承；未来 adapter 需提供对应调度和压缩生命周期接入。测试验证请求与状态合同，不保证真实模型摘要绝不遗漏，也不代表物理硬件验收。
+证据：`packages/pi/src/tools.ts`、`src/integration/extension.ts`、`compaction.ts`、`compaction.txt`、`src/application.ts` 和 `test/p0.test.mjs`。这两个完整保证属于 standalone 适配层，其他 harness 仅安装 core 不会自动继承；本轮已为 native Pi/OpenCode 接入各自调度和压缩生命周期，差异见下表。测试验证请求与状态合同，不保证真实模型摘要绝不遗漏，也不代表物理硬件验收。
 
 ### P1：紧接着补，按实际使用场景设门槛
 
@@ -239,8 +239,27 @@
 - `--record` 自动写入任务 instruction 是小而明确的补齐项；如果近期采集训练/评测数据，可与 P1 同批处理，但不阻塞普通 coding/设备操作。
 - 旧命令别名、键位、配置/session 迁移、自包含发布和第三方 Pi 包，不作为当前 standalone 正确性修复的前置条件。插件发布另按既定阶段推进。
 
-剩余建议顺序：**提示说明修正 → 无人值守指令和图片稳健性 → 循环控制及领域回归**。每项复用现有 Pi/core 能力；不恢复一套独立 coding harness。
+剩余建议顺序：**无人值守指令和图片稳健性 → 循环控制及领域回归**。每项复用现有 Pi/core 能力；不恢复一套独立 coding harness。
 
 上游参考（实现结论以安装的 0.86.1 为准，main 文档可能继续变化）：
 - https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md
 - https://github.com/earendil-works/pi/blob/main/packages/coding-agent/README.md
+
+## 11. v0.6.0 native adapter 范围
+
+上文主要对照 standalone；adapter 复用 core，保留宿主原生 coding 功能与身份。
+
+| 能力 | Standalone | Native Pi 0.86.1 | OpenCode 1.18.31 |
+| --- | --- | --- | --- |
+| feature packages | 显式 compose contributions | 同一合同 | 同一合同 |
+| tools/skills | 原生工具，批次结束刷新 | 原生工具，冲突加前缀；`kinex_skill` 加载各来源 skill | 固定 `kinex_tools` / `kinex_call`，调用时读取最新目录 |
+| 用户设备命令 | slash 参数与补全 | slash 参数、补全及 `kinex-` 别名 | TUI 原生选择/输入对话框，经本机 IPC 直达 server，不调用模型 |
+| 权限 | Kinex ask/auto/yolo 包括 coding | `/kinex-mode` 仅管 Kinex 工具 | core deny + 宿主原生审批，不修改宿主全局策略 |
+| 拒绝/取消 | 含机器人工具的整批顺序执行并中止后续调用 | 复用 Pi sequential 合同 | Kinex 调用串行并阻止该轮后续 Kinex 调用；已经运行的宿主 coding 工具不在保证内 |
+| 压缩 | 专属摘要规则，提交后立即持久化全量状态 | Pi 默认摘要，首次后续请求补全最新状态 | compact hook 注入领域状态；首次后续请求补全 |
+| context/cache | 持久化增量消息；Pi provider 协议 | 会话自定义条目、稳定位置投影 | 固定 gateway schema、消息 ID 锚定投影；ledger 存在机器人 workspace 下 |
+| 会话/资源 | 同 cwd 保持连接并结束旧录制，换 cwd 释放 | 同 cwd SDK factory handoff 保持连接；换 cwd/reload/quit 释放 | server 实例持有；会话删除结束其录制，server dispose 关闭全部资源 |
+| 录制 | 模型 opt-in，用户命令可直接操作 | `--kinex-recording` opt-in | server `enableRecording` opt-in；录制期间拒绝其他会话的非紧急 Kinex 操作 |
+| 自定义工具内采访 | Kinex 问答 UI | Pi 问答 UI | 首版拒绝；先使用宿主 question 获取信息 |
+
+额外限制：OpenCode context ledger 不随宿主 export/fork 转移；远程 attach 的直接命令和 Windows IPC 未支持。macOS 为目标平台但尚未实际验证。真实 Pi SDK/OpenCode server + TUI、同任务热加载、请求前缀、压缩、取消和录制归属已有回归；没有物理硬件或真实 cache-hit 验收。`@kinex/real-world` 和 Codex/MCP 尚未实现，第二 feature 的组合测试用于验证合同。

@@ -1,12 +1,9 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent"
-import type { KinexRuntime } from "@kinex/core"
+import type { KinexCapabilities } from "@kinex/core/integration"
 
-export async function contextUpdate(runtime: KinexRuntime, ctx: ExtensionContext, problems: string[]) {
+export async function contextUpdate(runtime: Pick<KinexCapabilities, "context">, ctx: ExtensionContext, problems: string[]) {
   const context = await runtime.context()
-  const snapshot: Record<string, string> = {
-    python: JSON.stringify(context.python), guides: context.guideRoots, devices: context.robotics,
-    conventions: context.conventions, skills: context.skills ?? "", recording: context.recording ?? "", problems: [...problems].sort().join("\n"),
-  }
+  const snapshot: Record<string, string> = { ...context.sections, problems: [...problems].sort().join("\n") }
   const branch = ctx.sessionManager.getBranch()
   const compactedAt = branch.findLastIndex(entry => entry.type === "compaction")
   const previous = branch.slice(compactedAt + 1).findLast(entry => entry.type === "custom_message" && entry.customType === "kinex-context")

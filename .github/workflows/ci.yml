@@ -24,5 +24,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:core
-      # npm test builds both packages and includes CLI, relocation and real PTY tests.
+      # Build and test standalone, then verify native adapters with real host loaders.
       - run: npm test
+      - run: npm run test:adapters
+      - run: node script/release.mjs --check

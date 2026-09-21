@@ -10,7 +10,7 @@ export class RoboticsOwner {
   failure?: Error
   private trace?: ExtensionContext["sessionManager"]
   private observed = new Set<string>()
-  constructor(readonly enableRecording: boolean, mode: Mode) { this.interaction = new Interaction(mode) }
+  constructor(public enableRecording: boolean, mode: Mode) { this.interaction = new Interaction(mode) }
 
   async enter(cwd: string): Promise<KinexRuntime> {
     const directory = path.resolve(cwd)

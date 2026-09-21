@@ -15,7 +15,7 @@ pid, master = pty.fork()
 if pid == 0:
     os.execvpe(sys.argv[1], sys.argv[1:], os.environ)
 fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 35, 100, 0, 0))
-deadline = time.monotonic() + 20
+deadline = time.monotonic() + float(os.environ.get("TUI_TEST_TIMEOUT", "20"))
 status = None
 received = b""
 keys = json.loads(os.environ.get("TUI_TEST_KEYS", "[]"))
@@ -53,7 +53,7 @@ try:
             break
         time.sleep(0.02)
     if status is None:
-        raise TimeoutError("TUI did not exit within 20 seconds")
+        raise TimeoutError("TUI did not exit before the test deadline")
 finally:
     if status is None:
         os.kill(pid, signal.SIGKILL)

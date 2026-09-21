@@ -49,6 +49,30 @@ provides a session ID, deletion confirmation and optional progress notifications
 Hosts own command registration, display, agent cancellation for stop, and submission
 of workflow prompts. This executor is a trusted user-command API, not a model tool.
 
+## Feature contributions
+
+`@kinex/core/integration` exports `KinexContribution`, `KinexCapabilities`,
+`ContributionCommand`, `Invocation`, `ToolSchema`, `coreContribution(runtime)` and
+`composeContributions(contributions)`. This is a host-independent capability
+interface, not a second runtime or a dynamic extension loader.
+
+```ts
+import { coreContribution, composeContributions } from "@kinex/core/integration"
+const capabilities = composeContributions([coreContribution(runtime)])
+// Future: add a real-world contribution here, borrowing the same runtime.
+const catalog = await capabilities.tools.list()
+const state = await capabilities.context() // stable instructions + source.section keys
+```
+
+A contribution can provide tools (`list`/`call`), skills (`list`/`load`), commands
+and context. Tools receive `Invocation` with session/call identity, abort signal,
+permission and question callbacks. Commands receive a distinct trusted
+`CommandContext`, including an optional abort signal. Load/reload also accept an
+optional signal. Each feature must preserve authorization/cancellation internally.
+Duplicate identifiers are errors; tool directories are re-read when calling.
+A contribution borrows resources; the product that created the runtime disposes it.
+The existing root APIs remain available without adopting contributions.
+
 ## Public runtime
 
 - `tools.list()` returns input JSON schemas plus discovery problems; defaulted
@@ -112,7 +136,7 @@ tools. This code is trusted executable workspace content, like standalone Kinex.
 Python and uv remain external. Core owns `.kinex/python/{pyproject.toml,uv.lock,.venv}`
 per workspace; it never adopts the ordinary Python project. Default drivers/tools,
 URDF inspection and camera encoders use it; explicit interpreters are supported.
-Use `uv add --project .kinex/python PACKAGE` for driver dependencies. Both host
+Use `uv add --project .kinex/python PACKAGE` for driver dependencies. Host
 shells remain generic; standalone supplies prompt guidance for explicitly selecting
 core Python. Existing root environments are left untouched. Video encoding requires ffmpeg.
 Neither dependency is needed just to import/discover the package.
@@ -127,7 +151,7 @@ npm run build:core    # Node ESM + declarations, including text modules
 npm run test:core     # real Node tests and npm tarball installed outside the repo
 npm run typecheck
 npm test             # standalone regression suite
-npm run build        # standalone and core npm build
+npm run build        # standalone, core and both adapters
 ```
 
 Node loads `dist/`. Build the core before

@@ -20,6 +20,7 @@ export type RoboticsCommand = typeof roboticsCommands[number]["name"]
 export type CommandResult = { kind: "output"; text: string; isError?: boolean } | { kind: "workflow"; prompt: string }
 export interface CommandContext {
   sessionID: string
+  signal?: AbortSignal
   confirm(title: string, description: string): Promise<boolean>
   notify?(message: string): void
 }
@@ -30,6 +31,7 @@ export function isRoboticsCommand(name: string): name is RoboticsCommand {
 
 // Trusted user-command API. Model calls must use runtime.tools.call instead.
 export async function executeRoboticsCommand(runtime: KinexRuntime, name: RoboticsCommand, args: string, context: CommandContext): Promise<CommandResult> {
+  context.signal?.throwIfAborted()
   const tokens = args.trim().split(/\s+/).filter(Boolean)
   const output = (text: string): CommandResult => ({ kind: "output", text })
   if (name === "onboarding" || name === "register" || name === "calibrate") {
@@ -60,7 +62,7 @@ export async function executeRoboticsCommand(runtime: KinexRuntime, name: Roboti
   const results = await Promise.allSettled(names.map(async target => {
     if (name === "unload") { await runtime.devices.unload(target); return `${target} unloaded` }
     if (name === "ping") return `${target}: ${JSON.stringify(await runtime.devices.ping(target))}`
-    const activation = await runtime.devices[name](target)
+    const activation = await runtime.devices[name](target, context.signal)
     if (activation.activating) context.notify?.(`${target}: activating`)
     await activation.ready
     return `${target} ${name === "load" ? "loaded" : "reloaded"}`

@@ -5,10 +5,12 @@ import {
   ModelRuntime, SessionManager, type CreateAgentSessionOptions,
 } from "@earendil-works/pi-coding-agent"
 import { paths, sessionDirectory, settings } from "./settings.ts"
-import { RoboticsOwner } from "./integration/owner.ts"
+import { RoboticsOwner } from "@kinex/pi/owner"
 import { kinexExtension } from "./integration/extension.ts"
 import { createCompactionControl } from "./integration/compaction.ts"
-import type { Mode } from "./integration/interaction.ts"
+import type { Mode } from "@kinex/pi/interaction"
+import type { KinexRuntime } from "@kinex/core"
+import { composeContributions, coreContribution, type KinexContribution } from "@kinex/core/integration"
 
 export interface ApplicationOptions {
   cwd: string
@@ -19,6 +21,7 @@ export interface ApplicationOptions {
   continue?: boolean
   session?: string
   report?: (text: string) => void
+  contributions?(runtime: KinexRuntime): readonly KinexContribution[]
 }
 
 export async function createApplication(options: ApplicationOptions) {
@@ -39,6 +42,7 @@ export async function createApplication(options: ApplicationOptions) {
   try {
     const host = await createAgentSessionRuntime(async ({ cwd: directory, sessionManager, sessionStartEvent }) => {
       const core = await owner.enter(directory)
+      const capabilities = composeContributions(options.contributions?.(core) ?? [coreContribution(core)])
       const settingsManager = settings(directory)
       const compaction = await createCompactionControl()
       let submitWorkflow = async (_prompt: string): Promise<void> => { throw new Error("Session is not initialized") }
@@ -48,7 +52,7 @@ export async function createApplication(options: ApplicationOptions) {
         resourceLoaderOptions: {
           noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true,
           systemPrompt: "", appendSystemPrompt: [],
-          extensionFactories: [{ name: "kinex", factory: kinexExtension(owner, core, options.report ?? (() => {}), {
+          extensionFactories: [{ name: "kinex", factory: kinexExtension(owner, core, capabilities, options.report ?? (() => {}), {
             prompt: prompt => submitWorkflow(prompt), settle: () => settle(), compaction,
           }), hidden: true }],
         },

@@ -80,7 +80,7 @@ Use `kinex --continue` or `kinex --session <id|file>` to resume Kinex sessions.
 
 Direct operations run without a model round trip. Only onboarding, registration
 and calibration submit workflows to the model. Their implementation and help live
-in the same core command catalog used by future host adapters.
+in feature contributions shared with the Pi and OpenCode adapters.
 
 ## Headless
 
@@ -187,6 +187,7 @@ See [DESIGN.md](DESIGN.md), [the core API](packages/core/README.md) and the
 npm run typecheck
 npm test                         # fake provider, CLI/package, real Linux/macOS PTY
 npm run test:core                # core and independent npm consumption
+npm run test:adapters            # after build; real Pi/OpenCode loading and TUI
 npm run test:tui                 # after build
 ```
 
@@ -195,18 +196,40 @@ PTY tests need Python 3 and a POSIX host. Do not rebuild core while consumer tes
 are running. Live provider cache rates and real robot task success require separate
 environment-specific validation.
 
-After building, `npm pack ./packages/core` and `npm pack` produce independent
-tarballs. Until core is published, install both tarballs in one npm invocation:
-`npm install /path/to/kinex-core-0.5.0.tgz /path/to/kinex-0.5.0.tgz`.
-No registry publication or self-contained Node release is performed by these commands.
+After building, pack all four packages with:
 
-GitHub Actions runs type checking, core package tests and the full standalone suite
-(including PTY interaction and package relocation) on pushes to `main` and pull
-requests. CI uses the Node version in `.nvmrc` and Python 3.12; these tests need no
-additional Python packages or physical devices.
+```sh
+npm run pack -- /tmp/kinex-release
+```
 
-Pushing a `v*` tag runs the same checks, verifies that the tag matches both package
-versions, then creates a GitHub Release with `kinex-VERSION.tgz`,
-`kinex-core-VERSION.tgz` and `SHA256SUMS`. These are npm packages requiring Node,
-not bundled executables. Install both downloaded tarballs together (add `-g` for
-a global CLI). The workflow does not publish to the npm registry.
+Until registry publication, install standalone with its two local dependencies:
+
+```sh
+npm install /tmp/kinex-release/kinex-core-0.6.0.tgz \
+  /tmp/kinex-release/kinex-pi-0.6.0.tgz \
+  /tmp/kinex-release/kinex-0.6.0.tgz
+```
+
+The OpenCode adapter is independently installable and is not a standalone dependency.
+GitHub CI checks types, core, standalone and both native adapters. Tests include
+real host loading, PTY interaction and package relocation. CI uses `.nvmrc`, Python
+3.12 and the pinned OpenCode dev dependency; no physical devices or paid models.
+
+A `v*` tag must match all four versions and exact internal dependencies. Release CI
+runs all checks and publishes four npm tarballs plus `SHA256SUMS` as GitHub assets.
+It does not publish to npm or bundle Node. Routine builds/tests publish nothing.
+
+## Use Kinex in another harness
+
+- [Pi extension](packages/pi/README.md): native text commands and dynamically registered tools.
+- [OpenCode plugin](packages/opencode/README.md): native command dialogs plus fixed discovery/call tools.
+
+Both consume `@kinex/core` and preserve the robotics workspace. They use the host's
+own coding configuration and sessions. Adapter packages live in the same workspace
+and release together, but users do not need standalone Kinex to install them.
+
+`@kinex/core/integration` defines feature contributions for tools, skills, commands
+and namespaced context. Host adapters consume contributions; product entrypoints
+explicitly compose them around a shared runtime. A future `@kinex/real-world` can
+provide onboarding independently without rewriting the host adapters. This release
+does not split that package, add a dynamic feature loader, or implement Codex/MCP.
