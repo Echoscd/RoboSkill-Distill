@@ -26,7 +26,12 @@ export async function roboticsContext(directory: string, enableRecording = false
   return {
     instructions: [ROBOTICS, PYTHON, DEVICE_USE].join("\n\n"),
     guideRoots: `Device guide roots (nearest first): ${roots.join(", ")}. Setup: load the setup-device skill.`,
-    python: { ...python, library: Assets.python(), workspaceLibrary: path.join(await CalibrationStore.workspaceDir(directory), "lib") },
+    // Execution environments include inherited credentials; only paths/readiness
+    // belong in model context. python.prepare()/status() retain the process env.
+    python: {
+      project: python.project, venv: python.venv, executable: python.executable, present: python.present,
+      library: Assets.python(), workspaceLibrary: path.join(await CalibrationStore.workspaceDir(directory), "lib"),
+    },
     robotics,
     conventions,
     skills: skills.length ? formatSkills(skills) : undefined,

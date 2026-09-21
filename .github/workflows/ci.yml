@@ -27,4 +27,5 @@ jobs:
       # Build and test standalone, then verify native adapters with real host loaders.
       - run: npm test
       - run: npm run test:adapters
+      - run: npm run test:codex
       - run: node script/release.mjs --check

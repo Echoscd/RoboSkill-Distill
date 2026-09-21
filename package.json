@@ -28,7 +28,8 @@
     "test:tui": "node --test test/tui.test.mjs",
     "build:adapters": "node script/build-adapters.mjs",
     "test:adapters": "node --test packages/pi/test/*.test.mjs packages/opencode/test/*.test.mjs",
-    "pack": "node script/release.mjs"
+    "pack": "node script/release.mjs",
+    "test:codex": "node --test packages/codex/test/*.test.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.86.1",
@@ -40,6 +41,7 @@
     "typebox": "1.3.27"
   },
   "devDependencies": {
+    "@openai/codex": "0.155.1",
     "@opentui/core": "0.4.5",
     "@opentui/keymap": "0.4.5",
     "@opentui/solid": "0.4.5",

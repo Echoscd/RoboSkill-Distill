@@ -11,8 +11,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      RELEASE_DIR: ${{ runner.temp }}/kinex-release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,12 +27,13 @@ jobs:
       - run: npm run test:core
       - run: npm test
       - run: npm run test:adapters
+      - run: npm run test:codex
       - name: Pack standalone, core and adapters
-        run: node script/release.mjs "$RELEASE_DIR" --tag "$GITHUB_REF_NAME"
+        run: node script/release.mjs "$RUNNER_TEMP/kinex-release" --tag "$GITHUB_REF_NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: kinex-packages
-          path: ${{ env.RELEASE_DIR }}/*
+          path: ${{ runner.temp }}/kinex-release/*
           if-no-files-found: error
 
   publish:

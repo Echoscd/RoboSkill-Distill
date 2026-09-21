@@ -11,6 +11,7 @@ Hardware and simulators share the same device contracts.
 | `src` | Standalone CLI, isolated coding storage and product policy; published Pi SDKs supply the coding harness and TUI. |
 | `packages/pi` | Shared Pi integration used by standalone, plus the native Pi extension. |
 | `packages/opencode` | Server-owned runtime and model tools; TUI command dialogs connect over local Unix IPC. |
+| `packages/codex` | Stdio MCP tools, permission/question forms and user controls over private Unix IPC. |
 
 `KinexContribution` exposes tools, skills, commands and context. Products explicitly
 compose contributions; adapters translate host APIs. Compatible feature changes
@@ -73,10 +74,17 @@ appended state; compaction restores a full snapshot before continuation. Standal
 adds robotics summary rules; native Pi keeps its summarizer. Images enter history
 as bytes. OpenCode's projection ledger stays local to the robotics workspace.
 
+Codex serializes Kinex calls, with immediate stop and invalidation of queued
+calls after denial/cancellation. Its MCP process owns one runtime and recording
+identity; a separate user CLI shares that runtime without model requests. Stable
+instructions accompany discovery; full context is available on demand and changes
+are returned with tool results. There is no per-turn/compaction hook or Codex
+transcript export. EOF/signals dispose resources. Core remains host-independent.
+
 ## Delivery
 
-One npm workspace releases four version-aligned packages with exact internal
-dependencies. Node >=22.19; tested hosts are Pi 0.86.1 and OpenCode 1.18.31.
+One npm workspace releases five version-aligned packages with exact internal
+dependencies. Node >=22.19; tested hosts are Pi 0.86.1, OpenCode 1.18.31 and Codex 0.155.1.
 CI checks contracts, real hosts and relocated packages before producing tarballs.
 See [core API](packages/core/README.md), [usage](README.md),
 [adapter limits](FEATURE_PARITY.md#11-v060-native-adapter-范围) and [progress](PLAN.md).

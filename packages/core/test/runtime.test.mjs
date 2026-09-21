@@ -235,11 +235,21 @@ run(dispatch, lambda: None)
 })
 
 test('core Python status is inert and initialization preserves the host Python project', async t => {
+  const secretKey = 'KINEX_TEST_CONTEXT_SECRET'
+  const previous = process.env[secretKey]
+  process.env[secretKey] = 'context-must-not-contain-this-credential'
+  t.after(() => { if (previous === undefined) delete process.env[secretKey]; else process.env[secretKey] = previous })
   const { runtime, directory } = await fixture(t)
   const hostProject = '[project]\nname="host-project"\nversion="0.0.0"\n'
   await writeFile(path.join(directory, 'pyproject.toml'), hostProject)
   const before = { ...process.env }
   const status = await runtime.python.status()
+  assert.equal(status.env[secretKey], process.env[secretKey])
+  const context = await runtime.context()
+  assert.equal('env' in context.python, false)
+  assert.equal(JSON.stringify(context).includes(process.env[secretKey]), false)
+  assert.equal(context.python.executable, status.executable)
+  assert.equal(context.python.present, status.present)
   assert.equal(status.project, path.join(directory, '.kinex', 'python'))
   await assert.rejects(readFile(path.join(status.project, 'pyproject.toml')), { code: 'ENOENT' })
   await runtime.python.initialize()

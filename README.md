@@ -188,6 +188,7 @@ npm run typecheck
 npm test                         # fake provider, CLI/package, real Linux/macOS PTY
 npm run test:core                # core and independent npm consumption
 npm run test:adapters            # after build; real Pi/OpenCode loading and TUI
+npm run test:codex               # after build; MCP, real Codex and package relocation
 npm run test:tui                 # after build
 ```
 
@@ -196,7 +197,7 @@ PTY tests need Python 3 and a POSIX host. Do not rebuild core while consumer tes
 are running. Live provider cache rates and real robot task success require separate
 environment-specific validation.
 
-After building, pack all four packages with:
+After building, pack all five packages with:
 
 ```sh
 npm run pack -- /tmp/kinex-release
@@ -210,21 +211,22 @@ npm install /tmp/kinex-release/kinex-core-0.6.0.tgz \
   /tmp/kinex-release/kinex-0.6.0.tgz
 ```
 
-The OpenCode adapter is independently installable and is not a standalone dependency.
-GitHub CI checks types, core, standalone and both native adapters. Tests include
+The OpenCode and Codex adapters install independently of standalone.
+GitHub CI checks types, core, standalone and all three adapters. Tests include
 real host loading, PTY interaction and package relocation. CI uses `.nvmrc`, Python
-3.12 and the pinned OpenCode dev dependency; no physical devices or paid models.
+3.12 and pinned OpenCode/Codex dev dependencies; no physical devices or paid models.
 
-A `v*` tag must match all four versions and exact internal dependencies. Release CI
-runs all checks and publishes four npm tarballs plus `SHA256SUMS` as GitHub assets.
+A `v*` tag must match all five versions and exact internal dependencies. Release CI
+runs all checks and publishes five npm tarballs plus `SHA256SUMS` as GitHub assets.
 It does not publish to npm or bundle Node. Routine builds/tests publish nothing.
 
 ## Use Kinex in another harness
 
 - [Pi extension](packages/pi/README.md): native text commands and dynamically registered tools.
 - [OpenCode plugin](packages/opencode/README.md): native command dialogs plus fixed discovery/call tools.
+- [Codex adapter](packages/codex/README.md): MCP tools and direct user controls sharing one runtime.
 
-Both consume `@kinex/core` and preserve the robotics workspace. They use the host's
+All consume `@kinex/core` and preserve the robotics workspace. They use the host's
 own coding configuration and sessions. Adapter packages live in the same workspace
 and release together, but users do not need standalone Kinex to install them.
 

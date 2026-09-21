@@ -2,8 +2,8 @@
 
 ## Architecture and delivery
 
-- One npm workspace owns `kinex`, `@kinex/core`, `@kinex/pi` and
-  `@kinex/opencode`. All four use version **0.6.0**, exact internal dependencies,
+- One npm workspace owns `kinex`, `@kinex/core`, `@kinex/pi`,
+  `@kinex/opencode` and `@kinex/codex`. All five use version **0.6.0**, exact internal dependencies,
   and a shared CI/release workflow. No separate `kinex_plugins` repository.
 - Standalone embeds published Pi SDKs; providers, coding tools, agent loop,
   sessions, compaction and TUI remain upstream-owned.
@@ -11,9 +11,9 @@
   `KinexContribution` interface exposes tools, skills, commands and context.
   Products explicitly compose features; adapters convert them to host APIs.
 - Future `@kinex/real-world` can contribute beside core using the same adapters.
-  Extraction, automatic package discovery and Codex/MCP are deferred.
+  Extraction and automatic package discovery are deferred.
 
-## Completed: standalone and first native adapters
+## Completed: standalone and host adapters
 
 - [x] Independent standalone with isolated coding storage, preserved robotics
   workspaces, native commands, ask/auto/yolo and recording opt-in.
@@ -33,13 +33,22 @@
 - [x] OpenCode TUI plugin: native dialogs and direct commands over private local
   IPC; no model needed. Disconnect cancels work; server owns runtime disposal.
 - [x] Preserve ancestor robotics workspace discovery when storing OpenCode context.
-- [x] Four independently packable npm artifacts, release version/dependency guard,
+- [x] Codex stdio MCP adapter with live contribution discovery, Core permission
+  forms/questionnaires, byte images, immediate stop and cancellation of queued work.
+- [x] Codex direct user controls share the server runtime over private local IPC;
+  manual recording remains available while model recording is opt-in.
+- [x] Codex startup/EOF/signals preserve initialization ordering, cancel owned
+  processes and finalize recording. Stable instructions and result context keep
+  host-independent Core assets authoritative.
+- [x] Model context exposes Python paths/readiness without inherited process
+  environment variables; execution APIs retain the environment for child processes.
+- [x] Five independently packable npm artifacts, release version/dependency guard,
   checksums, CI adapter tests and documentation. Actual publication is not part
   of this stage.
 
 ## Validation
 
-Validated on Linux, Node 22.19.0, Pi 0.86.1 and OpenCode 1.18.31:
+Validated on Linux, Node 22.19.0, Pi 0.86.1, OpenCode 1.18.31 and Codex 0.155.1:
 
 - Typechecking and builds pass.
 - Standalone: **46 tests**, including all four real PTY cases, context/cache
@@ -50,10 +59,15 @@ Validated on Linux, Node 22.19.0, Pi 0.86.1 and OpenCode 1.18.31:
   loading, actual OpenCode model requests and TUI interaction, zero-model device
   commands, hot loading, prefix preservation, compaction, runtime handoff,
   multi-feature routing, IPC cancellation and recording ownership.
+- Codex: **14 tests**, including actual host tool-search/model requests and forms,
+  hot loading, direct-control PTY confirmation without model requests, shared
+  recording, permissions, cancellation, initialization/exit cleanup, bounded
+  images and Core+Codex-only package relocation. Core/standalone checks rerun;
+  Pi/OpenCode packages and their tests were unchanged in this addition.
 - Tarballs install outside the checkout and still run after relocation.
   Standalone installs without OpenCode; adapters install without standalone.
 - Local release validation checks workflow syntax, matching/mismatched tags and
-  four package checksums. GitHub-hosted execution has not run.
+  package checksums. GitHub-hosted execution has not run.
 
 Tests use a local HTTP model provider and mock/Python drivers. No physical hardware
 or live provider cache-hit rate was measured. No npm publish, remote push or
@@ -70,6 +84,11 @@ release tag was performed for this stage.
 - OpenCode's context ledger is local workspace state and does not accompany host
   session export/fork. An active recording excludes other sessions' non-emergency
   Kinex operations until it ends.
+- Codex uses explicit full-context discovery and changed tool-result sections,
+  without per-turn/compaction hooks or conversation transcript export. Recording
+  belongs to the MCP instance. Direct controls require a running local server;
+  multiple instances must be selected explicitly. The queue cannot enforce a
+  host-wide turn halt or cancel Codex coding tools. No marketplace wrapper is needed.
 - Upstream upgrades require dependency updates and real-host regression checks.
   Standalone third-party Pi package loading remains disabled.
 
@@ -81,7 +100,7 @@ known gaps remain in package READMEs and FEATURE_PARITY.md.
 
 - [ ] Extract real-world onboarding into a separate feature package when its
   ownership is concrete; use the existing explicit contribution composition.
-- [ ] Codex/MCP integration and broader host compatibility.
+- [ ] Broader host/platform compatibility beyond the current local adapters.
 - [ ] Remaining standalone parity priorities: autonomous-mode instructions,
   bounded image attachment handling, loop/task budgets and robotics domain/RoboEnv
   regressions. See [FEATURE_PARITY.md](FEATURE_PARITY.md).
