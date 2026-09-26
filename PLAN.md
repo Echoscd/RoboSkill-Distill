@@ -1,3 +1,21 @@
+## Version 0.8.1
+
+- [x] Align package versions, internal dependencies, CLI/MCP versions and install examples.
+- [x] Verify typecheck, build, 63 core, 47 standalone, 20 Pi/OpenCode and 14 Codex tests.
+- [x] Pack all five tarballs and verify their checksums and v0.8.1 tag metadata.
+
+## Focused cleanup
+
+- [x] Keep recording capture in the recorder; simplify timers, promises and frame paths.
+- [x] Separate Python tool catalogs from execution and consolidate launch setup.
+- [x] Remove redundant smoke tests, formatting/migration checks and extraction fixtures;
+  consolidate joint validation and keep behavioral context tests across providers.
+- [x] Compare the packaged CLI version with its installed manifest.
+- [x] Verify typecheck, 63 core tests, 47 standalone tests, build and packaging.
+
+Tests are 171 lines smaller than the pre-cleanup suite. Queue invalidation uses
+deterministic scheduler coverage; runtime coverage retains interruption and recovery.
+
 ## Version 0.8.0
 
 - [x] Align package versions, internal dependencies, CLI output and install examples.

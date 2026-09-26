@@ -28,7 +28,8 @@ test('Core and Codex tarballs install alone, relocate and dispose a shared recor
   const cwd = path.join(directory, 'robot'); await mkdir(cwd)
   const runtime = createKinexRuntime({ directory: cwd }); await seed(runtime); await runtime.dispose()
   const entry = path.join(moved, 'node_modules/@kinex/codex/bin/kinex-codex.mjs')
-  assert.match((await exec(process.execPath, [entry, '--version'])).stdout, /0\.6\.0/)
+  const manifestVersion = JSON.parse(await readFile(path.join(moved, 'node_modules/@kinex/codex/package.json'), 'utf8')).version
+  assert.equal((await exec(process.execPath, [entry, '--version'])).stdout.trim(), manifestVersion)
   const env = Object.fromEntries(Object.entries(process.env).filter(([, value]) => typeof value === 'string'))
   const transport = new StdioClientTransport({ command: process.execPath, args: [entry, 'serve', '--directory', cwd], cwd: moved, env, stderr: 'pipe' })
   const client = new Client({ name: 'package-test', version: '1' })

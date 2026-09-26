@@ -2,7 +2,7 @@ import { serveProcess, terminate } from "../device/serve-process.ts"
 import { spawnProcess } from "../util/process.ts"
 import { abortable } from "../util/abort.ts"
 import { z } from "zod"
-import { pythonRuntime, pythonDiagnostic } from "../python/environment.ts"
+import { pythonDiagnostic } from "../python/environment.ts"
 import { deviceModel, deviceModelError } from "../calibration/device-model.ts"
 import { deviceInputValues } from "./device-input.ts"
 import path from "node:path"
@@ -11,14 +11,13 @@ import { CalibrationStore } from "../calibration/store.ts"
 import { matchesDeviceType } from "../device/profile/schema.ts"
 import { dispatchDevice, stopOwnedMotions } from "../device/dispatch.ts"
 import { isCommandAction } from "../device/interface.ts"
-import { Assets } from "../installation/assets.ts"
+import { pythonLaunch } from "../python/launch.ts"
 import { imageMime } from "../util/media.ts"
 import { NamedError } from "../util/error.ts"
 import { readLine, LineTimeoutError } from "../util/lines.ts"
 import { create } from "../util/log.ts"
 import type { Context, Result } from "./tool.ts"
-import type { PyToolInfo } from "./python.ts"
-import { listPyTools } from "./python.ts"
+import { listPyTools, type PyToolInfo } from "./python-catalog.ts"
 
 const log = create("python-tool")
 
@@ -27,11 +26,6 @@ class PyToolError extends NamedError {
     super("PyToolError", message, data)
   }
 }
-
-// Shared python helpers shipped with the harness (the `kinex` client lib
-// lives in repo-root python/), plus the robot's own lib/ — same import surface
-// device drivers get.
-const pythonDir = () => Assets.python()
 
 const MAX_DEPTH = 8
 
@@ -186,19 +180,14 @@ async function invoke(cwd: string, info: PyToolInfo, args: Record<string, unknow
   await validateInputs(cwd, info, args)
   signal.throwIfAborted()
   const entry = path.join(info.directory, info.manifest.entry)
-  const runtime = await pythonRuntime(cwd, info.manifest.interpreter, signal)
-  const lib = path.join(await CalibrationStore.workspaceDir(cwd), "lib")
-  const pythonPath = [pythonDir(), lib, ...(process.env["PYTHONPATH"] ? [process.env["PYTHONPATH"]] : [])].join(path.delimiter)
+  const runtime = await pythonLaunch(cwd, "tool", info.manifest.interpreter, signal)
   signal.throwIfAborted()
   const proc = spawnProcess([runtime.executable, entry, JSON.stringify(args)], {
     cwd: info.directory,
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    // KINEX_TOOL_DIALOG marks a real dialog spawn: only then does the
-    // kinex lib capture stdout for the protocol (so skill scripts and
-    // drivers can import kinex.geometry side-effect-free).
-    env: { ...runtime.env, PYTHONPATH: pythonPath, KINEX_TOOL_DIALOG: "1" },
+    env: runtime.env,
   })
   const onAbort = () => proc.kill()
   signal.addEventListener("abort", onAbort, { once: true })

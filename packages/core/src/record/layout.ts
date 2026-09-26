@@ -21,6 +21,8 @@ export const profileDir = (dir: string) => path.join(dir, "profile")
 export const deviceDir = (dir: string, name: string, passive = false) => path.join(dir, passive ? "passive" : "devices", name)
 export const eventsFile = (dir: string, name: string, passive = false) => path.join(deviceDir(dir, name, passive), "events.jsonl")
 export const streamDir = (dir: string, name: string) => path.join(deviceDir(dir, name), "stream")
+export const frameFile = (name: string, seq: number, suffix: string, passive = false) =>
+  path.join(deviceDir("", name, passive), "frames", `${String(seq).padStart(6, "0")}${suffix}`)
 
 export async function readManifest(dir: string): Promise<RecordingManifest | undefined> {
   const raw = await readJson<unknown>(manifestFile(dir))

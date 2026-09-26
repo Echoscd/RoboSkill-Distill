@@ -1,10 +1,10 @@
 import type { CommandAdmission } from "./scheduler.ts"
 import { scoped } from "../scope.ts"
 import { spawnProcess } from "../util/process.ts"
-import { pythonRuntime, pythonDiagnostic } from "../python/environment.ts"
+import { pythonDiagnostic } from "../python/environment.ts"
 import path from "node:path"
 import { CalibrationStore } from "../calibration/store.ts"
-import { Assets } from "../installation/assets.ts"
+import { pythonLaunch } from "../python/launch.ts"
 import { NamedError } from "../util/error.ts"
 import { exists } from "../util/filesystem.ts"
 import { serveProcess, terminate, type ServeProcess } from "./serve-process.ts"
@@ -51,20 +51,6 @@ export async function driverExists(cwd: string, device: Device): Promise<boolean
   const file = await driverPath(cwd, device)
   if (!file) return false
   return exists(file)
-}
-
-// Shared python helpers live beside the devices: .kinex/lib/ is
-// on PYTHONPATH for every driver, so two drivers talking to one SDK (an arm and
-// its gripper sharing a controller connection) import one module instead of
-// duplicating it. The harness's own python/ rides along for kinex.geometry
-// (pure pose math — the protocol side of the lib stays dialog-gated).
-const pythonDir = () => Assets.python()
-
-async function driverEnv(cwd: string, interpreter?: string, signal?: AbortSignal) {
-  const runtime = await pythonRuntime(cwd, interpreter, signal)
-  const lib = path.join(await CalibrationStore.workspaceDir(cwd), "lib")
-  const paths = [lib, pythonDir(), ...(process.env["PYTHONPATH"] ? [process.env["PYTHONPATH"]] : [])]
-  return { ...runtime, env: { ...runtime.env, PYTHONPATH: paths.join(":") } }
 }
 
 function parsePayload(deviceName: string, line: string | undefined): Record<string, unknown> {
@@ -186,7 +172,7 @@ async function runServe(
     if (existing && !existing.stopping && existing.proc.exitCode === null) return existing
     if (action !== "load") throw new DriverError(`device "${device.name}" is inactive; load it before ${action}`)
     if (existing) await terminate(existing)
-    const runtime = await driverEnv(cwd, device.access?.driver?.interpreter, signal)
+    const runtime = await pythonLaunch(cwd, "driver", device.access?.driver?.interpreter, signal)
     signal?.throwIfAborted()
     const proc = spawnProcess([runtime.executable, file, "--serve"], {
       cwd: path.dirname(file),
@@ -289,7 +275,7 @@ async function runOnce(
   admission?: CommandAdmission,
 ): Promise<DeviceReading> {
   signal = AbortSignal.any([...(signal ? [signal] : []), ...(admission?.interrupted ? [admission.interrupted] : [])])
-  const runtime = await driverEnv(cwd, device.access?.driver?.interpreter, signal)
+  const runtime = await pythonLaunch(cwd, "driver", device.access?.driver?.interpreter, signal)
   signal.throwIfAborted()
   admission?.check()
   const proc = spawnProcess([runtime.executable, file, action, JSON.stringify(args)], {

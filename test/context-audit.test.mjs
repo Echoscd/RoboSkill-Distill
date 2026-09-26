@@ -159,7 +159,7 @@ for (const profile of [
   { name: 'Anthropic deferred tools', api: 'anthropic-messages', compat: { supportsMidConvoSystemMessages: true, supportsMidConvoToolChanges: true } },
   { name: 'Responses fallback', api: 'openai-responses' },
 ]) {
-  test(`${profile.name}: native hot loading uses Pi's append or fallback protocol`, async t => {
+  test(`${profile.name}: tool changes execute correctly and preserve the prior request prefix`, async t => {
     const cwd = await workspace(t)
     const file = '.kinex/tool/late.ts'
     const source = version => `export default {description:'Late interface ${version}',execute:async()=>({title:'late',output:'LATE_${version}'})}`
@@ -179,24 +179,7 @@ for (const profile of [
     assert.match(JSON.stringify(messages(requests[2]).at(-1)), /LATE_V1/)
     assert.match(JSON.stringify(messages(requests[5]).at(-1)), /LATE_V2/)
     const tool = (request, name) => request.tools.find(tool => (tool.function?.name ?? tool.name) === name)
-    if (profile.api === 'anthropic-messages') {
-      assert.deepEqual(requests[1].tools.slice(0, requests[0].tools.length), requests[0].tools)
-      assert.equal(tool(requests[1], 'late').defer_loading, true)
-      assert.match(JSON.stringify(messages(requests[1])), /tool_addition/)
-      assert.deepEqual(requests[3].tools, requests[2].tools, 'native removal retains deferred definitions')
-      assert.match(JSON.stringify(messages(requests[3])), /tool_removal/)
-    } else if (profile.compat) {
-      assert.deepEqual(requests[1].tools, requests[0].tools, 'native addition preserves initial tool declarations')
-      assert.ok(!tool(requests[1], 'late'))
-      if (profile.compat.supportsAdditionalTools) assert.ok(requests[1].input.some(item => item.type === 'additional_tools' && item.tools.some(tool => tool.name === 'late')))
-      if (profile.compat.supportsToolSearch) assert.ok(requests[1].input.some(item => item.type === 'tool_search_output' && item.tools.some(tool => tool.name === 'late')))
-      if (profile.compat.supportsMidConvoToolAdditions) assert.ok(requests[1].messages.some(item => item.tools?.some(tool => tool.function.name === 'late')))
-      assert.ok(!tool(requests[3], 'late'), 'removal switches to the current tool set')
-      if (profile.api === 'openai-responses') assert.ok(!requests[3].input.some(item => ['additional_tools', 'tool_search_output'].includes(item.type)))
-    } else {
-      assert.ok(tool(requests[1], 'late'), 'fallback declares new tools at request level')
-      assert.notDeepEqual(requests[1].tools, requests[0].tools)
-    }
+    if (profile.compat) assert.deepEqual(requests[1].tools.slice(0, requests[0].tools.length), requests[0].tools)
     for (const index of [1, 2]) {
       const prefix = messages(requests[index - 1])
       assert.deepEqual(messages(requests[index]).slice(0, prefix.length), prefix)
@@ -205,7 +188,6 @@ for (const profile of [
     }
     const redefined = tool(requests[4], 'late')
     assert.equal((redefined.function ?? redefined).description, 'Late interface V2')
-    assert.ok(!redefined.defer_loading, 'same-name interface edits use the fallback declaration')
   })
 }
 

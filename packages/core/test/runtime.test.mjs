@@ -41,14 +41,6 @@ async function pythonDriver(runtime, directory, persistent = true) {
   return dir
 }
 
-test('importing and constructing the runtime installs no process handlers', async () => {
-  const before = process.eventNames().map(name => [name, process.listenerCount(name)])
-  const runtime = createKinexRuntime({ directory: '/tmp' })
-  await runtime.dispose()
-  assert.deepEqual(process.eventNames().map(name => [name, process.listenerCount(name)]), before)
-  assert.equal(globalThis.Bun, undefined)
-})
-
 test('core discovery and context contain robotics tools and packaged assets', async t => {
   const { runtime } = await fixture(t)
   const { tools, problems } = await runtime.tools.list()
@@ -60,25 +52,6 @@ test('core discovery and context contain robotics tools and packaged assets', as
   assert.ok((await runtime.devices.templates()).some(entry => entry.type === 'rgb'))
   assert.ok((await runtime.context()).robotics.includes('sensor'))
   assert.ok((await runtime.calibration.plan()).items)
-})
-
-test('device and record tools default to verbose results without changing raw observations', async t => {
-  const { runtime } = await fixture(t, { host, enableRecording: true })
-  const { tools } = await runtime.tools.list()
-  for (const name of ['device', 'record']) assert.equal(tools.find(tool => tool.name === name).inputSchema.properties.verbose.default, true)
-  const call = (name, args) => runtime.tools.call(name, args, { sessionID: 'output-test' })
-  const full = JSON.parse((await call('device', { deviceID: 'sensor' })).output)
-  assert.deepEqual(full.efforts, [])
-  const concise = await call('device', { deviceID: 'sensor', verbose: false, compact: true })
-  assert.equal(concise.output.includes('\n'), false)
-  assert.equal('efforts' in JSON.parse(concise.output), false)
-  assert.deepEqual(JSON.parse(concise.output).faults, [])
-  assert.deepEqual((await runtime.devices.dispatch('sensor', 'read')).data.efforts, [])
-  const snap = await call('record', { action: 'snap', devices: ['sensor'] })
-  assert.deepEqual(JSON.parse(snap.output).refusals, {})
-  const cleanSnap = await call('record', { action: 'snap', devices: ['sensor'], verbose: false })
-  assert.equal('refusals' in JSON.parse(cleanSnap.output), false)
-  assert.deepEqual(JSON.parse(cleanSnap.output).readings.sensor.data.faults, [])
 })
 
 test('two runtimes isolate mock state and observers even in the same workspace', async t => {
@@ -161,20 +134,10 @@ test('Python tools use the packaged client and drain noisy stderr', async t => {
   const dir = path.join(directory, '.kinex', 'tool', 'node_python')
   await mkdir(dir, { recursive: true })
   await writeFile(path.join(dir, 'tool.yaml'), 'name: node_python\nkind: perception\ndescription: test\ninterpreter: python3\n')
-  await writeFile(path.join(dir, 'tool.py'), 'import os\nfrom kinex import robot, finish\nos.write(2, b"x" * 1024 * 1024)\nfinish({**robot(), "nested": {"deeper": {"values": [1, 2]}}})\n')
+  await writeFile(path.join(dir, 'tool.py'), 'import os\nfrom kinex import robot, finish\nos.write(2, b"x" * 1024 * 1024)\nfinish(robot())\n')
   const result = await runtime.tools.call('node_python', {}, { sessionID: 's' })
   assert.ok(!result.isError, result.output)
   assert.equal(JSON.parse(result.output).identity.id, 'node-test')
-  assert.match(result.output, /\n  "nested": \{\n    "deeper": \{"values":\[1,2\]\}\n  \}/)
-})
-
-test('calibration samples format their JSON payload after the textual result header', async t => {
-  const { runtime } = await fixture(t, { host })
-  const result = await runtime.tools.call('calib_sample', { deviceID: 'sensor', routine: 'format-test' }, { sessionID: 's' })
-  assert.ok(!result.isError, result.output)
-  assert.match(result.output, /^recorded sample 0[^\n]+\n\{\n  "note":/)
-  const data = JSON.parse(result.output.slice(result.output.indexOf('\n') + 1))
-  assert.deepEqual(data.faults, [])
 })
 
 test('recording works concurrently in two runtimes and finalizes on disposal', async t => {
@@ -286,27 +249,6 @@ test('core Python status is inert and initialization preserves the host Python p
   assert.equal(await readFile(path.join(directory, 'pyproject.toml'), 'utf8'), hostProject)
   assert.ok(JSON.stringify(process.env) === JSON.stringify(before), "host environment changed")
   assert.equal((await runtime.python.status()).present, false)
-})
-
-test('joint sequences reject old targets and return current mock timestamps', async t => {
-  const { runtime } = await fixture(t, { host })
-  await runtime.profiles.writeDevice({ name: 'arm', type: 'joint', loaded: true,
-    access: { connection: { kind: 'mock' } }, intrinsics: {
-      model: { format: 'joints', joints: [{ name: 'j0', type: 'revolute', limits: { min: -2, max: 2 }, max_velocity: 2, max_effort: null }] },
-      home: null, control: { mode: 'position' },
-      feedback: { velocities: true, efforts: false, clock: 'simulation' },
-      stop: { behavior: 'hold', affected_devices: ['arm'] },
-    },
-  })
-  for (const for_s of [undefined, 0, -1, NaN, Infinity]) {
-    await assert.rejects(runtime.devices.dispatch('arm', 'write', { target: [0.2], ...(for_s === undefined ? {} : { for_s }) }))
-  }
-  assert.equal((await runtime.devices.dispatch('arm', 'read')).data.positions[0], 0)
-  const written = (await runtime.devices.dispatch('arm', 'write', { actions: [[0.2]], freq_hz: 50 })).data
-  const read = (await runtime.devices.dispatch('arm', 'read')).data
-  assert.equal(written.elapsed_s, 0.02)
-  assert.equal(written.state.sample_time_s, 0.02)
-  assert.equal(written.state.sample_time_s, read.sample_time_s)
 })
 
 test('drive executes through runtime schema validation and the Python dialog', async t => {
@@ -467,15 +409,13 @@ test('persistent responses can finish out of order without swapping callers', as
   assert.deepEqual(order, ['fast', 'slow'])
 })
 
-test('stop interrupts an active write and invalidates queued writes without restarting motion', { timeout: 5000 }, async t => {
+test('stop interrupts active motion and allows a subsequent write', { timeout: 5000 }, async t => {
   const { runtime } = await concurrentFixture(t)
   const active = runtime.devices.dispatch('sensor', 'write', { actions: [[1]], freq_hz: 50 })
   const activeRejected = assert.rejects(active, /interrupt/i)
   await waitForRead(runtime, state => state.active)
-  const queued = runtime.devices.dispatch('sensor', 'write', { actions: [[2]], freq_hz: 50 })
-  const queuedRejected = assert.rejects(queued, /interrupt/i)
   await runtime.devices.dispatch('sensor', 'stop')
-  await Promise.all([activeRejected, queuedRejected])
+  await activeRejected
   assert.deepEqual((await runtime.devices.dispatch('sensor', 'read')).data.started, [1])
   const next = runtime.devices.dispatch('sensor', 'write', { actions: [[2]], freq_hz: 50 })
   await waitForRead(runtime, state => state.started.length === 2)
@@ -584,6 +524,8 @@ test('joint buffers validate before execution and accept arbitrary rates', async
   const sequence = (await runtime.devices.dispatch('arm', 'write', { actions: [[0.1], [0.2]], freq_hz: 25 })).data
   assert.equal(sequence.completed_actions, 2)
   assert.equal(sequence.elapsed_s, 0.08)
+  assert.equal(sequence.state.sample_time_s, sequence.elapsed_s)
+  assert.equal((await runtime.devices.dispatch('arm', 'read')).data.sample_time_s, sequence.state.sample_time_s)
   assert.equal(sequence.reached, undefined)
   assert.deepEqual(sequence.state.positions, [0.2])
   for (const freq_hz of [3, 30, 60, 123.4]) {

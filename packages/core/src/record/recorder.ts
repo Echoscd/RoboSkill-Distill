@@ -12,7 +12,7 @@ import { NamedError } from "../util/error.ts"
 import { writeJson } from "../util/filesystem.ts"
 import { Identifier } from "../util/id.ts"
 import { create } from "../util/log.ts"
-import { eventsFile, listRecordings, manifestFile, recordingsDir, snapshotProfiles, timelineFile, traceFile, writeManifest } from "./layout.ts"
+import { eventsFile, frameFile, listRecordings, manifestFile, recordingsDir, snapshotProfiles, timelineFile, traceFile, writeManifest } from "./layout.ts"
 import type { DeviceReading } from "../device/driver.ts"
 import { createSampler, type Sampler } from "./sampler.ts"
 import { createStreams, sizeOf, type Streams } from "./stream.ts"
@@ -59,7 +59,7 @@ interface Active {
   // map) so a deactivated device's unload row stays with its recording.
   designated: Set<string>
   seq: Map<string, number>
-  manifestTimer: ReturnType<typeof setInterval>
+  manifestTimer?: ReturnType<typeof setInterval>
   persisting?: Promise<void>
   stopping?: Promise<RecordingManifest>
   reads: Set<Promise<unknown>>
@@ -148,7 +148,7 @@ function boundedData(data: Record<string, unknown> | undefined): Record<string, 
 }
 
 function stage(active: Active, device: Device, seq: number, source: string, suffix: string, passive: boolean): { rel: string; bytes: number } | undefined {
-  const rel = path.join(passive ? "passive" : "devices", device.name, "frames", `${String(seq).padStart(6, "0")}${suffix}`)
+  const rel = frameFile(device.name, seq, suffix, passive)
   const bytes = (() => {
     try { return stageFile(source, path.join(active.dir, rel)) }
     catch (error) {
@@ -438,8 +438,6 @@ async function open(cwd: string, kind: RecordingManifest["kind"], sessionID: str
     messageRange: {},
     notes: 0,
   }
-  // The periodic quota check refers to the initialized recording.
-  const holder: { active?: Active } = {}
   const writer = createWriter()
   const active: Active = {
     cwd,
@@ -455,29 +453,28 @@ async function open(cwd: string, kind: RecordingManifest["kind"], sessionID: str
     designated: new Set(),
     seq: new Map(),
     reads: new Set(),
-    manifestTimer: setInterval(() => {
-      if (!holder.active || holder.active.manifest.status !== "recording") return
-      void persistManifest(holder.active).then(async () => {
-        if (state().active !== active || active.manifest.status !== "recording") return
-        for (const [name, stream] of Object.entries(active.streams.stats())) {
-          if (stream.status !== "error") continue
-          await active.sampler.remove(name)
-          await active.streams.remove(name)
-        }
-        if (active.manifest.error) {
-          await Recorder.stop({ endedBy: "error" })
-          return
-        }
-        if (active.manifest.bytes < active.config.max_mb * 1024 * 1024) return
-        active.manifest.quotaHit = true
-        await Recorder.stop({ endedBy: "quota" })
-      }).catch((error: unknown) => {
-        active.manifest.error = error instanceof Error ? error.message : String(error)
-        void Recorder.stop({ endedBy: "error" }).catch((failure: unknown) => log.warn("recording could not be saved", { error: String(failure) }))
-      })
-    }, MANIFEST_INTERVAL_MS),
   }
-  holder.active = active
+  active.manifestTimer = setInterval(() => {
+    if (active.manifest.status !== "recording") return
+    void persistManifest(active).then(async () => {
+      if (state().active !== active || active.manifest.status !== "recording") return
+      for (const [name, stream] of Object.entries(active.streams.stats())) {
+        if (stream.status !== "error") continue
+        await active.sampler.remove(name)
+        await active.streams.remove(name)
+      }
+      if (active.manifest.error) {
+        await Recorder.stop({ endedBy: "error" })
+        return
+      }
+      if (active.manifest.bytes < active.config.max_mb * 1024 * 1024) return
+      active.manifest.quotaHit = true
+      await Recorder.stop({ endedBy: "quota" })
+    }).catch((error: unknown) => {
+      active.manifest.error = error instanceof Error ? error.message : String(error)
+      void Recorder.stop({ endedBy: "error" }).catch((failure: unknown) => log.warn("recording could not be saved", { error: String(failure) }))
+    })
+  }, MANIFEST_INTERVAL_MS)
   state().active = active
   timeline(active, { kind: "record.start" })
   return active
@@ -502,9 +499,8 @@ async function captureReads(active: Active, devices: string[], refusals: Record<
         readings[name] = { error: reading }
         return
       }
-      const seq = active.seq.get(name) ?? 0
       const file = reading.filePath
-        ? path.join("devices", name, "frames", `${String(seq).padStart(6, "0")}${path.extname(reading.filePath) || ".bin"}`)
+        ? frameFile(name, active.seq.get(name) ?? 0, path.extname(reading.filePath) || ".bin")
         : undefined
       readings[name] = { ...(reading.data ? { data: boundedData(reading.data) } : {}), ...(file ? { file } : {}) }
     }),
@@ -665,11 +661,10 @@ export const Recorder = {
       await persistManifest(active)
       if (!input.fromTool) await exportTrace(active)
       if (input.fromTool && state().host.exportTrace) {
-        const holder = { resolve: () => {} }
-        const promise = new Promise<void>((resolve) => { holder.resolve = resolve })
-        active.finalMessage = { resolve: holder.resolve, promise }
+        const { promise, resolve } = Promise.withResolvers<void>()
+        active.finalMessage = { resolve, promise }
         state().pending.add(active)
-        const timeout = setTimeout(holder.resolve, 15_000)
+        const timeout = setTimeout(resolve, 15_000)
         const exporting = promise.then(async () => {
           clearTimeout(timeout)
           state().pending.delete(active)

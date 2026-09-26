@@ -40,6 +40,7 @@ test('packed package runs in an unrelated directory without Bun or repository as
     assert.deepEqual(count(), before)
     assert.equal(globalThis.Bun, undefined)
     const runtime = createKinexRuntime({directory: process.cwd()})
+    assert.deepEqual(count(), before)
     try {
       const skill = await runtime.skills.load('setup-device')
       assert.ok(skill.info.file.startsWith(path.join(process.cwd(), 'node_modules')))
@@ -56,6 +57,7 @@ test('packed package runs in an unrelated directory without Bun or repository as
       assert.equal((await runtime.tools.call('echo', {}, {sessionID:'package'})).output, 'installed')
       console.log('packed Node package passed')
     } finally { await runtime.dispose() }
+    assert.deepEqual(count(), before)
   `], { cwd: directory, env })
   assert.match(stdout, /packed Node package passed/)
 })

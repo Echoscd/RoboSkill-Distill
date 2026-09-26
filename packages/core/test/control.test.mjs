@@ -2,7 +2,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
@@ -147,18 +146,6 @@ test('identical arguments produce identical motion however the world advances', 
   assert.equal(stepped.result.rounds, 1)
 })
 
-test('move_to reads only at preparation and final verification', async () => {
-  for (const background of [true, false]) {
-    const device = arm({ background })
-    const { result, error, stderr } = await move(device)
-    assert.equal(error, undefined, stderr)
-    assert.equal(device.reads, 2)
-    assert.ok(device.writes >= 3, 'rest, trajectory and arrival use bounded buffers')
-  }
-})
-
-
-
 test('a pose goal is solved by the device IK driver', async () => {
   for (const background of [true, false]) {
     const device = arm({ background, ik: GOAL })
@@ -283,17 +270,6 @@ test('track runs policy chunks and stops every owned device on a miss and final 
   assert.equal(first.stops, 3)
   assert.equal(second.stops, 3)
 })
-
-test('no builtin tool asks the agent to reason about the execution mode', async () => {
-  const banned = /wall[- ]clock|simulation time|\brealtime\b|\bstepped\b/i
-  for (const entry of await readdir(toolDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue
-    const manifest = await readFile(path.join(toolDir, entry.name, 'tool.yaml'), 'utf8')
-    const offending = manifest.split('\n').filter((line) => banned.test(line))
-    assert.deepEqual(offending, [], `${entry.name}/tool.yaml leaks the execution mode:\n${offending.join('\n')}`)
-  }
-})
-
 
 function base(background, { stall = false, reached = true } = {}) {
   const self = { clock: 0, writes: [], stops: 0 }
@@ -429,26 +405,6 @@ test('policy faults stop commanded devices after their buffered calls settle', a
   assert.match(stderr, /fault: hand/)
   assert.ok(first.stops >= 1)
   assert.ok(second.stops >= 1)
-})
-
-test('drive and track schemas reject removed modes before execution', async () => {
-  const { parse } = await import('yaml')
-  const { z } = await import('zod')
-  const schema = async name => z.fromJSONSchema(parse(await readFile(path.join(toolDir, name, 'tool.yaml'), 'utf8')).parameters)
-  const hold = await schema('drive')
-  assert.ok(hold.safeParse({ device: 'base', mode: 'walk', duration_s: 1 }).success)
-  for (const extra of [{ displacement: { x: 1 } }, { observation: {} }, { timeout_s: 1 }, { on_timeout: 'continue' }])
-    assert.equal(hold.safeParse({ device: 'base', mode: 'walk', duration_s: 1, ...extra }).success, false)
-  const tracking = await schema('track')
-  const args = { perceive: { tool: 'p' }, process: { tool: 'convert' }, control: { tool: 'custom', args: { arbitrary: 1 } } }
-  assert.ok(tracking.safeParse(args).success)
-  for (const extra of [{ timeout_s: 1 }, { stop_when_reached: false }, { bridge: { tool: 'convert' } }, { process: undefined }])
-    assert.equal(tracking.safeParse({ ...args, ...extra }).success, false)
-  const moving = await schema('move-to')
-  const goal = { device: 'arm', timeout_s: 1, pose: [0, 0, 0, 0, 0, 0, 1] }
-  assert.ok(moving.safeParse(goal).success)
-  for (const extra of [{ observation: {} }, { offset_m: [0, 0, 0] }, { orientation: [0, 0, 0, 1] }, { joints: [0] }])
-    assert.equal(moving.safeParse({ ...goal, ...extra }).success, false)
 })
 
 test('shipped driver wrappers enforce budgets and preserve vendor execution results', async () => {

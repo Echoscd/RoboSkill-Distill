@@ -1,6 +1,6 @@
 {
   "name": "@kinex/codex",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Codex MCP and local user controls for Kinex robotics",
   "type": "module",
   "engines": {
@@ -21,7 +21,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@kinex/core": "0.8.0",
+    "@kinex/core": "0.8.1",
     "@modelcontextprotocol/sdk": "1.30.0",
     "zod": "^4.4.3"
   }
