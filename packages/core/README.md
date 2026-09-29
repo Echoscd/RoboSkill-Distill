@@ -87,10 +87,14 @@ Devices consume them at their fixed cadence. Position devices retain the last
 reference; velocity devices expire to zero velocity while retaining posture.
 `world.read` returns `time_s`; `world.wait(duration_s)` waits on the driver's clock.
 
-- `servo` plans and submits a joint trajectory segment from measured state. It
-  accepts joints or a pose, without waiting for arrival. Short durations truncate
-  the trajectory; longer durations hold the goal. Planning defaults are 1 rad/s
-  and 3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints, capped by known limits.
+- `servo` plans and submits a full joint trajectory from measured state. It
+  accepts joints or a pose and returns immediately, with no duration input.
+  Results report computed `duration_s`, requested/IK-resolved target `joints`, and
+  final commanded reference `end_joints`. Continuous-joint references may differ
+  from the target by a full revolution. These are plan information, not measured
+  arrival: allow execution with `world.wait` and verify using feedback. Planning
+  defaults are 1 rad/s and 3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints,
+  capped by known limits. Lower `speedFraction` lengthens the computed duration.
 - `run_policy` infers once, splits the selected chunk across devices, and submits
   buffers concurrently. Cartesian `pose` and `pose_delta` actions use frozen
   reference frames and seeded IK; `target_frame` must be rigidly attached to the
@@ -118,7 +122,7 @@ call("track", world="world", wait_s=0.1,
      perceive={"tool": "target_pose"},
      process={"tool": "relative_pose", "args": {"parent": {"frame": "arm"}},
               "inputs": {"/child/frame": "/frame", "/child/pose": "/pose"}},
-     control={"tool": "servo", "args": {"device": "arm", "duration_s": 0.2},
+     control={"tool": "servo", "args": {"device": "arm"},
               "inputs": {"/pose": "/pose"}},
      until={"tool": "settled", "args": {"timeout_s": 10}})
 ```
@@ -134,6 +138,14 @@ requesting controller capability requires a controller caller.
 Track stops owned motion on misses, errors, cancellation and final exit.
 `stop_after_control` also stops it after each round's wait. Cleanup cannot stop
 another invocation's replacement. Uncertain writes are never retried.
+`wait_s` is the observation/replanning interval; a new control call can replace
+the remaining references of a full servo plan before it completes.
+
+Migration: remove `duration_s` from servo arguments; obsolete input is rejected.
+The Python `kinex.trajectory.trajectory(...)` helper also removes its `duration_s`
+keyword and now returns a `Trajectory` dataclass instead of a reference list.
+Use `plan.actions` and `plan.duration_s` together when submitting a device write.
+Device writes and `run_policy` retain their existing duration contracts.
 
 ## Public runtime
 

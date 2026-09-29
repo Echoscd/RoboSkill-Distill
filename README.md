@@ -105,8 +105,19 @@ Writes submit an action buffer with `duration_s` and return immediately.
 Gripper and suction use flat `actions: [value, ...]`; joint devices and dexterous
 hands use `actions: [[joint1, joint2, ...], ...]`. A single command uses one action.
 Use `device("world", "wait", duration_s=...)` for delays in the driver's clock.
-`servo` plans and submits a joint trajectory. `track` composes perception,
-processing, control and an `until` predicate, waiting `wait_s` each round.
+`servo` plans and submits a full joint trajectory, returning immediately with its
+computed `duration_s`, requested/IK-resolved target `joints`, and final commanded
+reference `end_joints`. It accepts no duration override. Use `world.wait` to allow
+execution time and measured feedback to verify arrival; neither submission nor
+elapsed duration confirms arrival. Position devices retain the final reference.
+`track` composes perception, processing, control and an `until` predicate, waiting
+`wait_s` each round. This is its observation/replanning interval: a new control
+call can replace the remaining references, and exit or `stop_after_control` can
+interrupt a plan.
+
+For existing servo calls, remove the `duration_s` argument; obsolete input is
+rejected. The returned duration now comes from the planner. Device writes and
+`run_policy` keep their existing duration behavior.
 
 `device` calls one device; `devices` accepts a batch of calls:
 
@@ -129,7 +140,7 @@ composition transforms that full pose into the arm frame and tracks it:
   },
   "control": {
     "tool": "servo",
-    "args": {"device": "arm", "duration_s": 0.2},
+    "args": {"device": "arm"},
     "inputs": {"/pose": "/pose"}
   },
   "until": {"tool": "settled", "args": {"timeout_s": 10}},
@@ -155,7 +166,7 @@ or waiting for discovery. For a previously measured target in the arm frame:
     "args": {"target": {"pose": [0.3, 0, 0.2, 0, 0, 0, 1]}}
   },
   "process": {"python": "lambda observation: observation"},
-  "control": {"tool": "servo", "args": {"device": "arm", "duration_s": 0.2}},
+  "control": {"tool": "servo", "args": {"device": "arm"}},
   "until": {"tool": "settled", "args": {"timeout_s": 10}}
 }
 ```

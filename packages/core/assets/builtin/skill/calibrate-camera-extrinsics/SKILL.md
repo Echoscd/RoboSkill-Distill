@@ -14,6 +14,9 @@ frame; the procedure runs on the color stream). One pure-numpy Tsai–Lenz solve
 
 Choose the variant from the recorded mount; ask only if the physical arrangement is unclear.
 Use servo with speedFraction ≤ 0.15 for the loop. Anyone steadying the board keeps hands clear. Scratch: `.kinex/calib/calibrate-camera-extrinsics/`.
+Servo submits the full plan and returns immediately with its computed duration_s;
+allow that time with world.wait, then verify measured arrival before sampling.
+Its joints and end_joints are targets/references, not measured positions.
 
 In the examples, `<core-python>` is `python.executable` from context; set `PYTHONPATH` to `python.library` for the command.
 Scratch paths are workspace-relative; pass absolute evidence paths to scripts.

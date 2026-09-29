@@ -22,7 +22,11 @@ profiles. Install missing dependencies in the prepared runtime within the user's
 authorization. Ask for physical setup, contact reports and missing measurements,
 without duplicating tool permission prompts.
 
-Use the skill's motion speed. servo scales planning rates with speedFraction. calib_sample reads measured state; settling
+Use the skill's motion speed. servo scales planning rates with speedFraction and submits
+the full plan, returning immediately with computed duration_s. It accepts no duration
+override. Allow execution with world.wait and verify measured arrival before the next
+step or sample; joints and end_joints describe targets/references, not arrival or contact.
+calib_sample reads measured state; settling
 requires measured velocities and fresh timestamps. Without that feedback, collect
 an ordinary sample after the procedure's independent stationary confirmation.
 

@@ -66,11 +66,15 @@ contract; extraction and a shared default composition module remain deferred.
   composed calls retain permissions and recording attribution. Skills supply
   procedures. Detection/segmentation feed perception; depth localization respects
   masks and reports camera-relative measurements. `servo` plans from measured
-  joint positions and submits a trajectory segment for `duration_s`, without
-  stopping, settling or arrival checks. Planning rates default to 1 rad/s and
-  3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints, capped by known limits.
-  Short windows truncate the trajectory; long windows hold the goal. Planning
-  does not promise collision avoidance.
+  joint positions and submits a full trajectory at its computed duration, without
+  waiting, stopping, settling or arrival checks. It accepts no duration override;
+  results report computed `duration_s`, requested/IK-resolved target `joints` and
+  final commanded reference `end_joints`, not measured arrival. Planning rates
+  default to 1 rad/s and 3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints,
+  capped by known limits.
+  The Python planner returns references and duration together. Position devices
+  retain the final reference; later writes or stop can interrupt the plan.
+  Planning does not promise collision avoidance.
   `track` composes perceive → process → control → world.wait → optional stop → until.
   Each stage references a tool or supplies inline Python: a lambda or source
   defining `main`, called with keyword arguments and returning JSON data.
@@ -82,8 +86,10 @@ contract; extraction and a shared default composition module remain deferred.
   Pointers from the previous result into arguments. Nulls are misses; absent paths
   are errors. It passes context and predicate state explicitly. `stop_after_control` defaults
   false; misses, errors, cancellation and final exit stop owned motion.
-  `settled` checks joint error, quiet velocity and stable world time, with an
-  optional world-time timeout. `device` and `devices` share execution; batches
+  `track.wait_s` sets the observation/replanning interval; each control call may
+  replace the remaining references, and exit or `stop_after_control` may interrupt
+  the plan. `settled` checks joint error, quiet velocity and stable world time,
+  with an optional world-time timeout. `device` and `devices` share execution; batches
   authorize before dispatch, preserve result order and report per-entry failures.
   Python composition retains capability restrictions and forbids lifecycle changes.
   `run_policy` infers once, converts Cartesian actions using frozen frames and

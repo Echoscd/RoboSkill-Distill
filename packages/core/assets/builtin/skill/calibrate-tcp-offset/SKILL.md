@@ -48,6 +48,9 @@ interactive because only the user can report "touching". Per sample:
    10 cm, use `servo` pose goals in `<arm>` for the new orientation, then
    approach in user-confirmed ~5 mm steps until "touching". Direct writes accept joint
    reference sequences only. Use servo planning rates and speedFraction to slow contact approaches.
+   Servo submits the full plan and returns immediately with computed duration_s;
+   allow execution with world.wait and verify measured arrival before the next
+   approach or sample. Its end_joints is a commanded reference, not contact confirmation.
 2. `calib_sample deviceID=<arm> routine=calibrate-tcp-offset settle={...}
    note="touch N, <orientation description>"`.
 3. **Validate as you go**: check the new quaternion's angular distance to every kept sample
