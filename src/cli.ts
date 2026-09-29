@@ -2,12 +2,14 @@ import { parseArgs } from "node:util"
 import { InteractiveMode, runPrintMode } from "@earendil-works/pi-coding-agent"
 import { createApplication } from "./application.ts"
 import { executeRoboticsCommand } from "@kinex/core"
+import { exportSession } from "./export.ts"
 
 const help = `Kinex — robotics coding agent
 
 kinex [options]                       Interactive terminal
 kinex run [options] "prompt"          Run once; prints the final reply
 kinex run "/devices"                  Direct robotics command; no model needed
+kinex --export session.jsonl [output.html]  Export a session without a model
 
 --model provider/model               Select a Pi model/provider
 --thinking off|minimal|low|medium|high|xhigh
@@ -29,11 +31,17 @@ async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, strict: true, options: {
     help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" },
     model: { type: "string" }, thinking: { type: "string" }, effort: { type: "string" },
+    export: { type: "string" },
     continue: { type: "boolean" }, session: { type: "string" }, auto: { type: "boolean" }, yolo: { type: "boolean" },
     "enable-recording": { type: "boolean" }, record: { type: "string" }, seed: { type: "string" }, json: { type: "boolean" },
   } })
   if (values.help) { console.log(help); return }
   if (values.version) { console.log("0.9.0"); return }
+  if (values.export !== undefined) {
+    if (!values.export || positionals.length > 1 || positionals[0] === "") throw new Error("Usage: kinex --export <session.jsonl> [output.html]")
+    process.exitCode = await exportSession(values.export, positionals[0])
+    return
+  }
   if (values.auto && values.yolo) throw new Error("Choose --auto or --yolo")
   const thinking = values.thinking ?? values.effort
   if (thinking !== undefined && thinking !== "off" && thinking !== "minimal" && thinking !== "low" && thinking !== "medium" && thinking !== "high" && thinking !== "xhigh") throw new Error("Invalid thinking level")
@@ -59,9 +67,15 @@ async function main(): Promise<void> {
     if (headless) {
       if (values.record && app.owner.runtime) {
         await Promise.all((await app.owner.runtime.devices.warmLoaded()).map(activation => activation.ready))
-        await executeRoboticsCommand(app.owner.runtime, "record", `start ${values.record}`, {
+        const started = await executeRoboticsCommand(app.owner.runtime, "record", `start ${values.record}`, {
           sessionID: app.host.session.sessionId, confirm: async () => false,
         })
+        if (started.kind !== "output") throw new Error("Recording did not return a result")
+        const report: unknown = JSON.parse(started.text)
+        if (report && typeof report === "object" && "refusals" in report && report.refusals && typeof report.refusals === "object") {
+          const refusals = Object.entries(report.refusals)
+          if (refusals.length) console.error(`Kinex: --record refused: ${refusals.map(([device, reason]) => `${device}: ${reason}`).join("; ")}`)
+        }
       }
       process.exitCode = await runPrintMode(app.host, {
         mode: values.json ? "json" : "text",

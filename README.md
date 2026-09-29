@@ -214,6 +214,14 @@ needed. `--effort` is an alias of `--thinking`. `--seed` submits an initial prom
 in interactive mode. Each headless process releases its drivers when it exits;
 `loaded` intent persists and is restored by the next process.
 
+`--record` reports refused streams to stderr. Valid streams continue recording,
+and the task still runs if every stream is refused, including with `--json`.
+
+Export a saved session with `kinex --export session.jsonl [output.html]` without
+model credentials or a robotics runtime. The default output is
+`pi-session-<basename>.html` in the current directory. Export preserves the source
+session, including older formats, and rejects output paths referring to that file.
+
 ## Configuration and permissions
 
 Kinex uses separate storage from Pi and from legacy Kinex coding sessions:

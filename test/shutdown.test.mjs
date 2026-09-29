@@ -59,3 +59,43 @@ run(dispatch, close)
     assert.equal(recordings[0].status, 'stopped')
   })
 }
+
+for (const specs of ['sensor=2', 'sensor=2 camera=2', 'camera=2']) for (const json of [false, true]) {
+  test(`headless --record ${specs} reports refusals and continues the model task (json=${json})`, { timeout: 15000 }, async t => {
+    const cwd = await workspace(t)
+    const fake = await fakeProvider(t, isolation.root)
+    const core = createKinexRuntime({ directory: cwd })
+    await seed(core)
+    await core.profiles.writeDevice({ name: 'sensor', loaded: true })
+    await core.dispose()
+
+    const reader = createKinexRuntime({ directory: cwd })
+    t.after(() => reader.dispose())
+    let statusDuringTask
+    fake.respond = async () => {
+      statusDuringTask = (await reader.recording.recent())[0]?.status
+      return { text: 'TASK_COMPLETED' }
+    }
+    const child = spawn(process.execPath, [entry, 'run', '--auto', '--model', 'fake/test',
+      '--record', specs, ...(json ? ['--json'] : []), 'Read the sensors'], { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', data => { stdout += data })
+    child.stderr.on('data', data => { stderr += data })
+    t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL') })
+    const [code] = await once(child, 'close')
+    assert.equal(code, 0, stderr)
+    if (specs.includes('camera=')) assert.match(stderr, /--record refused: camera: no device "camera" in this workspace/)
+    else assert.equal(stderr, '')
+    if (json) for (const line of stdout.trim().split('\n')) assert.doesNotThrow(() => JSON.parse(line))
+    assert.match(stdout, /TASK_COMPLETED/)
+    assert.equal(fake.requests.length, 1)
+    const hasValidDevice = specs.includes('sensor=')
+    assert.equal(statusDuringTask, hasValidDevice ? 'recording' : 'stopped')
+
+    const recordings = await reader.recording.recent()
+    assert.equal(recordings.length, 1)
+    assert.equal(recordings[0].status, 'stopped')
+    assert.deepEqual(Object.keys(recordings[0].sampling.devices), hasValidDevice ? ['sensor'] : [])
+  })
+}

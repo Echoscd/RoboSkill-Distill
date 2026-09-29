@@ -13,9 +13,11 @@ collects those changes; individual fix branches integrate into `dev`.
 - [x] Normalize near-unit pose quaternions and frame estimates within 0.001;
   test boundaries, invalid inputs, IK, frame consumers and strict profile checks.
 - [x] Trim agent-facing world usage to clock, budget and geometry essentials.
+- [x] Report headless recording refusals and add source-preserving CLI HTML export.
+- [x] Verify export aliases, older sessions, errors, interruption and packaging.
 - [x] Build and pack the combined changes.
 
-Combined validation passed: typecheck, 53 standalone tests and 115 core tests,
+Combined validation passed: typecheck, 69 standalone tests and 115 core tests,
 including 12 Python motion tests. Standalone/core build and local release
 packaging also passed.
 Execution tests used mock devices and temporary Python drivers.
