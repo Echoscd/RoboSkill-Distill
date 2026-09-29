@@ -6,23 +6,16 @@ description: World clock and optional spatial reference.
 
 ## Use
 
-`read()` returns `{time_s}`. `wait({duration_s})` waits in world time and returns
-`{time_s, elapsed_s}`. Waits are concurrent and individually cancellable.
-The driver abstracts the clock; callers do not select an execution mode.
+`read()` returns `time_s` and optional `budget: {elapsed_s, max_s}`: episode seconds
+consumed and allowed. `max_s: null` means no cap. Budget is informational;
+Kinex does not enforce it.
 
-Reads may include an optional episode budget, for example:
-`{time_s: 42, budget: {elapsed_s: 2.5, max_s: 250}}`.
-Budget values are seconds: `elapsed_s` is finite and nonnegative, and `max_s` is
-finite and positive or `null` for no cap. Omit `budget` when it is unavailable.
-Drivers own accounting and conversion from native counts to seconds; Kinex does
-not infer budget values from `time_s` or enforce the allowance. Elapsed time may
-exceed the allowance. Budget objects accept only `elapsed_s` and `max_s`; legacy
-`used`, `max` and `unit` fields are rejected. Wait results carry no budget, and
-their top-level `elapsed_s` describes that wait rather than the episode.
+`wait({duration_s})` waits in world time and returns `{time_s, elapsed_s}`;
+`elapsed_s` is the actual duration of that wait. Waits are concurrent and
+individually cancellable.
 
-World geometry is optional. Bounds and posed surfaces are informational;
-they do not constrain motion or imply transforms between disconnected frame trees.
-Named frames are fixed; `null` live transforms are not supported on world.
+Optional bounds and surfaces are informational: they do not constrain motion
+or establish transforms between disconnected frame trees.
 
 ## Setup
 

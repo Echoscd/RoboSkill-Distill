@@ -12,6 +12,7 @@ collects those changes; individual fix branches integrate into `dev`.
 - [x] Cover large payloads, startup ordering, image references and interruption.
 - [x] Normalize near-unit pose quaternions and frame estimates within 0.001;
   test boundaries, invalid inputs, IK, frame consumers and strict profile checks.
+- [x] Trim agent-facing world usage to clock, budget and geometry essentials.
 - [x] Build and pack the combined changes.
 
 Combined validation passed: typecheck, 53 standalone tests and 115 core tests,
