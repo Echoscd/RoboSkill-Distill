@@ -1,9 +1,18 @@
 """Harness-owned, synchronized rest-to-rest joint trajectory generation."""
 
 import math
+from dataclasses import dataclass
 
 from kinex.motion import joint_target, vector
 from kinex.validation import number
+
+
+@dataclass(frozen=True)
+class Trajectory:
+    """A complete reference buffer and its planned execution duration."""
+
+    actions: list[list[float]]
+    duration_s: float
 
 
 def planning_limits(joints, max_velocity=None, max_acceleration=None):
@@ -29,8 +38,8 @@ def planning_limits(joints, max_velocity=None, max_acceleration=None):
     return result
 
 
-def trajectory(joints, start, target, period_s, fraction=1.0, max_velocity=None, max_acceleration=None, *, duration_s=None, check_limits=True):
-    """Sample synchronized quintic joint references."""
+def trajectory(joints, start, target, period_s, fraction=1.0, max_velocity=None, max_acceleration=None, *, check_limits=True):
+    """Plan a full synchronized quintic; return its references and duration."""
     start = joint_target(start, joints, check_limits=check_limits)
     target = joint_target(target, joints, check_limits=check_limits)
     if not math.isfinite(period_s) or period_s <= 0 or not 0 < fraction <= 1:
@@ -45,15 +54,12 @@ def trajectory(joints, start, target, period_s, fraction=1.0, max_velocity=None,
         # Exact extrema of 10s^3 - 15s^4 + 6s^5 and its derivatives.
         duration = max(duration, 1.875 * abs(distance) / (velocity * fraction),
                        math.sqrt(10 / math.sqrt(3) * abs(distance) / (acceleration * fraction)))
-    window = duration if duration_s is None else number(duration_s, "duration_s")
-    if window <= 0:
-        raise ValueError("duration_s must be positive")
-    count = math.ceil(window / period_s)
+    count = math.ceil(duration / period_s)
     if count > 1_000_000:
         raise ValueError("trajectory exceeds one million references")
     result = []
     for tick in range(1, count + 1):
-        t = min(1.0, tick * window / count / duration)
+        t = tick / count
         scale = t ** 3 * (10 + t * (-15 + 6 * t))
         result.append(joint_target([a + d * scale for a, d in zip(start, delta)], joints, check_limits=check_limits))
-    return result
+    return Trajectory(actions=result, duration_s=duration)

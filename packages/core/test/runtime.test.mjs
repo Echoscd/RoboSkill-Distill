@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, utimes } from 'node:f
 import os from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { createHash } from 'node:crypto'
 const globals = await mkdtemp(path.join(os.tmpdir(), 'kinex-node-home-'))
 process.env.KINEX_CONFIG_DIR = path.join(globals, 'config')
 process.env.KINEX_DATA_DIR = path.join(globals, 'data')
@@ -40,6 +41,104 @@ async function pythonDriver(runtime, directory, persistent = true) {
   await writeFile(path.join(dir, 'driver.py'), driver)
   return dir
 }
+
+async function pythonTool(directory, name, code, kind = 'perception', timeout = 10) {
+  const dir = path.join(directory, '.kinex/tool', name)
+  await mkdir(dir, { recursive: true })
+  await writeFile(path.join(dir, 'tool.yaml'), `name: ${name}\nkind: ${kind}\ndescription: test\ninterpreter: python3\ntimeout_s: ${timeout}\nparameters: {type: object}\n`)
+  await writeFile(path.join(dir, 'tool.py'), code)
+  return dir
+}
+
+test('Python startup carries large Unicode arguments and inline source through nested calls', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  await pythonTool(directory, 'digest', `import hashlib, os, subprocess, sys
+from kinex import args, finish, robot
+robot()  # Must not consume the startup request as an RPC response.
+a = args()
+assert args() == a
+assert len(sys.argv) == 1
+assert 'KINEX_TOOL_DIALOG' not in os.environ
+child = subprocess.run([sys.executable, '-c', 'import kinex; print("ordinary import")'], capture_output=True, text=True, check=True)
+assert child.stdout.strip() == 'ordinary import'
+finish({'length': len(a['value']), 'sha256': hashlib.sha256(a['value'].encode()).hexdigest()})
+`)
+  await pythonTool(directory, 'nested', `from kinex import args, inline, finish
+a = args()
+finish(inline(a['source'], {'value': a['value']}))
+`)
+  const source = `# ${'large source '.repeat(15000)}\nfrom kinex import call\ndef main(value):\n    return call('digest', value=value)\n`
+  for (const value of ['small', 'x'.repeat(3 * 1024 * 1024), '🦾画像'.repeat(100000)]) {
+    for (const name of ['digest', 'nested']) {
+      const response = await runtime.tools.call(name, name === 'nested' ? { value, source } : { value }, { sessionID: 's' })
+      assert.ok(!response.isError, response.output)
+      assert.deepEqual(JSON.parse(response.output), {
+        length: [...value].length, sha256: createHash('sha256').update(value).digest('hex'),
+      })
+    }
+  }
+})
+
+test('one-shot drivers accept large requests, receive EOF and release resources', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  const dir = await pythonDriver(runtime, directory, false)
+  await writeFile(path.join(dir, 'driver.py'), `import hashlib, sys
+from kinex.driver_protocol import run
+def dispatch(action, args):
+    assert len(sys.argv) == 1
+    assert sys.stdin.read() == ''
+    return {'ok': True, 'sha256': hashlib.sha256(args['value'].encode()).hexdigest()}
+def cleanup():
+    with open('closed', 'a') as output: output.write('closed\\n')
+run(dispatch, cleanup)
+`)
+  for (const value of ['small', 'x'.repeat(3 * 1024 * 1024), '🦾画像'.repeat(100000)]) {
+    const result = await runtime.devices.dispatch('sensor', 'read', { value })
+    assert.equal(result.data.sha256, createHash('sha256').update(value).digest('hex'))
+  }
+  assert.equal((await readFile(path.join(dir, 'closed'), 'utf8')).trim().split('\n').length, 3)
+})
+
+test('large startup writes tolerate noisy tools and report early exit', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  await pythonTool(directory, 'noisy', `import os
+os.write(1, b'diagnostic\\n' * 100000)
+os.write(2, b'diagnostic\\n' * 100000)
+from kinex import args, finish
+finish(len(args()['value']))
+`)
+  const args = { value: 'x'.repeat(3 * 1024 * 1024) }
+  const response = await runtime.tools.call('noisy', args, { sessionID: 's' })
+  assert.ok(!response.isError, response.output)
+  assert.equal(JSON.parse(response.output), args.value.length)
+  await pythonTool(directory, 'exits', 'raise RuntimeError("exit before startup")\n')
+  const exited = await runtime.tools.call('exits', args, { sessionID: 's' })
+  assert.equal(exited.isError, true)
+  assert.match(exited.output, /cannot send tool request|exit before startup/)
+  const dir = await pythonDriver(runtime, directory, false)
+  await writeFile(path.join(dir, 'driver.py'), 'raise RuntimeError("exit before startup")\n')
+  await assert.rejects(runtime.devices.dispatch('sensor', 'read', args), /cannot send request|exit before startup/)
+})
+
+test('blocked startup writes respect cancellation and deadlines', { timeout: 20000 }, async t => {
+  for (const mode of ['cancel', 'timeout']) await t.test(mode, async t => {
+    const { runtime, directory } = await fixture(t, { host })
+    const code = 'import time\ntime.sleep(30)\n'
+    await pythonTool(directory, 'blocked', code, 'perception', 1)
+    const dir = await pythonDriver(runtime, directory, false)
+    await writeFile(path.join(dir, 'driver.py'), code)
+    const args = { value: 'x'.repeat(3 * 1024 * 1024) }
+    const start = Date.now()
+    const result = await runtime.tools.call('blocked', args, { sessionID: 's',
+      ...(mode === 'cancel' ? { signal: AbortSignal.timeout(300) } : {}),
+    })
+    assert.equal(result.isError, true)
+    assert.match(result.output, /abort|interrupt|timed out|timeout/i)
+    await assert.rejects(runtime.devices.dispatch('sensor', 'read', args,
+      mode === 'cancel' ? AbortSignal.timeout(300) : undefined), /abort|timeout|exited|cannot send request/i)
+    assert.ok(Date.now() - start < 8000)
+  })
+})
 
 test('core discovery and context contain robotics tools and packaged assets', async t => {
   const { runtime } = await fixture(t)
@@ -293,7 +392,7 @@ test('cancelling a controller before motion does not stop unowned devices', { ti
   t.after(() => abort.abort())
   const pending = runtime.tools.call('track', {
     perceive: { tool: 'slow_point' }, process: { tool: 'relative_pose', args: { parent: { frame: 'arm' } }, inputs: { '/child': '' } },
-    control: { tool: 'servo', args: { device: 'arm', duration_s: 1 } },
+    control: { tool: 'servo', args: { device: 'arm' } },
     world: 'world', wait_s: .1, until: { tool: 'settled' },
   }, { sessionID: 's', signal: AbortSignal.any([abort.signal, AbortSignal.timeout(5000)]) })
   const settled = pending.then(result => ({ result }), error => ({ error }))
@@ -522,12 +621,12 @@ test('native motion stop failures preserve progress and fence subsequent command
 })
 
 
-test('servo submits through the runtime and world.wait executes its buffer', async t => {
+test('servo validates inputs and submits complete, replaceable plans through the runtime', async t => {
   const { runtime, directory } = await fixture(t, { host })
   await runtime.profiles.writeDevice({ name: 'world', type: 'world', loaded: true, access: { connection: { kind: 'mock' } } })
   await runtime.profiles.writeDevice({ name: 'arm', type: 'joint', loaded: true,
     access: { connection: { kind: 'mock' } }, intrinsics: {
-      model: { format: 'joints', joints: [{ name: 'j0', type: 'revolute', limits: { min: -2, max: 2 }, max_velocity: 1, max_acceleration: 2, max_effort: null }] },
+      model: { format: 'joints', joints: [0, 1].map(i => ({ name: `j${i}`, type: 'revolute', limits: { min: -3, max: 3 }, max_velocity: 1, max_acceleration: 3, max_effort: null })) },
       home: null, control: { mode: 'position' },
       feedback: { velocities: true, efforts: false, clock: 'simulation' },
       stop: { behavior: 'hold', affected_devices: ['arm'] },
@@ -539,13 +638,46 @@ test('servo submits through the runtime and world.wait executes its buffer', asy
     const source = await readFile(new URL(`../assets/builtin/tool/servo/${name}`, import.meta.url), 'utf8')
     await writeFile(path.join(dir, name), source + (name.endsWith('yaml') ? '\ninterpreter: python3\n' : ''))
   }
-  const response = await runtime.tools.call('servo', { device: 'arm', joints: [.2], duration_s: 3 }, { sessionID: 's' })
+  const events = []
+  t.after(runtime.subscribe(({ type, event }) => { if (type === 'device') events.push(event) }))
+  const obsolete = await runtime.tools.call('servo', { device: 'arm', joints: [2, 1], duration_s: 2.5 }, { sessionID: 's' })
+  assert.equal(obsolete.isError, true)
+  assert.match(obsolete.output, /duration_s/)
+  assert.ok(!events.some(event => event.action === 'write'))
+  const response = await runtime.tools.call('servo', { device: 'arm', joints: [2, 1] }, { sessionID: 's' })
   assert.ok(!response.isError, response.output)
   const result = JSON.parse(response.output)
-  assert.deepEqual(result.joints, [.2])
-  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [0])
-  await runtime.devices.dispatch('world', 'wait', { duration_s: 3 })
-  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [.2])
+  assert.deepEqual(result.joints, [2, 1])
+  assert.deepEqual(result.end_joints, [2, 1])
+  assert.equal(result.duration_s, 3.75)
+  assert.equal(result.actions_submitted, 375)
+  assert.deepEqual(result.write.state.positions, [0, 0])
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [0, 0])
+  assert.ok(!events.some(event => event.action === 'wait' || event.action === 'stop'))
+  await runtime.devices.dispatch('world', 'wait', { duration_s: 2.5 })
+  const midway = (await runtime.devices.dispatch('arm', 'read')).data.positions
+  assert.ok(Math.abs(midway[0] - 1.5802469135802466) < 1e-12)
+  await runtime.devices.dispatch('world', 'wait', { duration_s: result.duration_s - 2.5 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [2, 1])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: 10 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [2, 1])
+
+  const submit = async joints => {
+    const response = await runtime.tools.call('servo', { device: 'arm', joints }, { sessionID: 's' })
+    assert.ok(!response.isError, response.output)
+    return JSON.parse(response.output)
+  }
+  await submit([0, 0])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: .1 })
+  const replacement = await submit([1, .5])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: replacement.duration_s + 10 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [1, .5])
+  const interrupted = await submit([0, 0])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: .1 })
+  await runtime.devices.dispatch('arm', 'stop')
+  const stopped = (await runtime.devices.dispatch('arm', 'read')).data.positions
+  await runtime.devices.dispatch('world', 'wait', { duration_s: interrupted.duration_s + 10 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, stopped)
 })
 
 async function trackingFixture(t) {
@@ -610,6 +742,74 @@ finish({'custom': True})
   return { ...value, args, events }
 }
 
+test('failed large startup writes in composed tools stop owned motion', async t => {
+  const { runtime, directory, events } = await trackingFixture(t)
+  await pythonTool(directory, 'blocked', 'import time\ntime.sleep(30)\n', 'perception', 1)
+  await pythonTool(directory, 'starts', `from kinex import args, device, call, finish
+device('arm', 'write', actions=[[.2]], duration_s=.1)
+finish(call('blocked', value=args()['value']))
+`, 'controller')
+  const result = await runtime.tools.call('starts', { value: 'x'.repeat(3 * 1024 * 1024) }, { sessionID: 's' })
+  assert.equal(result.isError, true)
+  assert.match(result.output, /timeout|timed out/i)
+  assert.deepEqual(events.filter(e => e.action === 'stop').map(e => e.device.name), ['arm'])
+  assert.equal((await runtime.devices.dispatch('arm', 'read')).data.stopped, true)
+})
+
+test('track maps fresh camera file entries to controllers without encoding image bytes', async t => {
+  const { runtime, directory, args } = await trackingFixture(t)
+  const dir = await pythonDriver(runtime, directory, false)
+  await writeFile(path.join(dir, 'source.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=', 'base64'))
+  await writeFile(path.join(dir, 'driver.py'), `from pathlib import Path
+import uuid
+from kinex.driver_protocol import run
+def dispatch(action, args):
+    frame = Path(str(uuid.uuid4()) + '.png').resolve()
+    frame.write_bytes(Path('source.png').read_bytes())
+    return {'ok': True, 'file': str(frame)}
+run(dispatch, lambda: None)
+`)
+  const image = await runtime.tools.call('device', { deviceID: 'sensor' }, { sessionID: 's' })
+  assert.ok(!image.isError, image.output)
+  assert.equal(image.attachments[0].mime, 'image/png')
+  const result = await runtime.tools.call('track', { ...args, max_rounds: 2,
+    perceive: { python: 'from kinex import device\ndef main():\n    return {"image": device("sensor")["file"]}\n' },
+    process: { python: 'lambda observation: observation' },
+    control: { python: `from pathlib import Path
+def main(observation):
+    image = observation['images'][0]
+    assert Path(image).read_bytes().startswith(b'\\x89PNG')
+    return image
+`, inputs: { '/observation/images/0': '/image' } },
+    until: { python: 'lambda context, state: {"done": False, "state": (state or []) + ([context["control_result"]] if context["round"] else [])}' },
+  }, { sessionID: 's' })
+  assert.ok(!result.isError, result.output)
+  const value = JSON.parse(result.output)
+  assert.equal(new Set(value.until_state).size, 2)
+  assert.equal(value.last, value.until_state[1])
+  for (const file of value.until_state) assert.deepEqual(await readFile(file), await readFile(path.join(dir, 'source.png')))
+})
+
+test('track passes large generated observations through stages and predicate context', async t => {
+  const { runtime, args } = await trackingFixture(t)
+  const result = await runtime.tools.call('track', { ...args,
+    perceive: { python: 'lambda: {"samples": list(range(60000))}' },
+    process: { python: 'lambda observation: observation' },
+    control: { python: 'lambda samples: {"count": len(samples)}' },
+    until: { python: `def main(context, state):
+    if not context['round']:
+        return {'done': False}
+    assert context['observation']['samples'] == list(range(60000))
+    assert context['control_args']['samples'] == context['observation']['samples']
+    return {'done': True, 'state': context['control_result']['count']}
+` },
+  }, { sessionID: 's' })
+  assert.ok(!result.isError, result.output)
+  assert.deepEqual(JSON.parse(result.output), {
+    terminated_by: 'until', rounds: 1, perception_misses: 0, last: { count: 60000 }, until_state: 60000,
+  })
+})
+
 test('track stops owned actuators on misses and errors, excluding model inference and unrelated motion', async t => {
   for (const mode of ['model', 'fail']) {
     await t.test(mode, async t => {
@@ -667,6 +867,43 @@ test('cancelling track during processing stops owned motion without stopping its
   assert.deepEqual([...new Set(events.filter(e => e.action === 'stop').map(e => e.device.name))], ['hand'])
   assert.equal((await runtime.devices.dispatch('arm', 'read')).data.stopped, false)
   assert.equal((await runtime.devices.dispatch('hand', 'read')).data.stopped, true)
+})
+
+test('world read exposes driver time budgets without advancing time or changing waits', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  for (const [name, maximum] of [['bounded', .1], ['unbounded', null], ['absent', undefined]]) {
+    await runtime.profiles.writeDevice({ name, type: 'world', loaded: false,
+      access: { connection: { kind: 'process' }, driver: {
+        interpreter: 'python3', persistent: true, actions: ['read', 'wait', 'load', 'unload', 'status'],
+      } } })
+    await writeFile(path.join(directory, `.kinex/devices/${name}/driver.py`), `from kinex.driver_protocol import run
+elapsed = 0.0
+def dispatch(action, args):
+    global elapsed
+    if action not in ('read', 'wait'):
+        return {'ok': True, 'loaded': action != 'unload'}
+    duration = args.get('duration_s', 0)
+    if action == 'wait':
+        elapsed += duration
+    budget = ${maximum === undefined ? '{}' : `{'budget': {'elapsed_s': elapsed, 'max_s': ${maximum === null ? 'None' : maximum}}}`}
+    return {'ok': True, 'time_s': 1000 + elapsed, 'elapsed_s': duration, 'extra': True, **budget}
+run(dispatch, lambda: None)
+`)
+    await (await runtime.devices.load(name)).ready
+    const expected = elapsed_s => ({ time_s: 1000 + elapsed_s,
+      ...(maximum === undefined ? {} : { budget: { elapsed_s, max_s: maximum } }) })
+    for (const verbose of [true, false]) for (const compact of [true, false]) {
+      const response = await runtime.tools.call('device', { deviceID: name, action: 'read', verbose, compact }, { sessionID: 's' })
+      assert.ok(!response.isError, response.output)
+      assert.deepEqual(JSON.parse(response.output), expected(0))
+    }
+    for (const time_s of [1000.25, 1000.5]) {
+      const wait = await runtime.tools.call('device', { deviceID: name, action: 'wait', args: { duration_s: .25 } }, { sessionID: 's' })
+      assert.ok(!wait.isError, wait.output)
+      assert.deepEqual(JSON.parse(wait.output), { time_s, elapsed_s: .25 })
+      assert.deepEqual((await runtime.devices.dispatch(name, 'read')).data, expected(time_s - 1000))
+    }
+  }
 })
 
 test('cancelling one world wait leaves concurrent waits and the driver usable', async t => {

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, readFile, rm, rename, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, rename, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,6 +31,11 @@ test('standalone and core tarballs install and relocate without plugin packages'
   assert.equal((await invoke('--version')).stdout.trim(), manifest.version)
   assert.match((await invoke('--help')).stdout, /--enable-recording/)
   assert.match((await invoke('run', '/devices')).stdout, /No devices/)
+  const session = JSON.stringify({ type: 'session', version: 2, id: 'packaged-export', timestamp: new Date().toISOString(), cwd: relocated }) + '\n'
+  await writeFile(path.join(relocated, 'session.jsonl'), session)
+  assert.match((await invoke('--export', 'session.jsonl')).stdout, /Exported to: pi-session-session.html/)
+  assert.match(await readFile(path.join(relocated, 'pi-session-session.html'), 'utf8'), /<!DOCTYPE html>/)
+  assert.equal(await readFile(path.join(relocated, 'session.jsonl'), 'utf8'), session)
   await assert.rejects(stat(path.join(relocated, '.pi')), { code: 'ENOENT' })
   await assert.rejects(stat(path.join(relocated, '.kinex/python')), { code: 'ENOENT' })
 })

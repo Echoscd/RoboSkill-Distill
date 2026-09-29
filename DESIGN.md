@@ -34,7 +34,8 @@ contract; extraction and a shared default composition module remain deferred.
   Reads run alongside writes; independent devices write concurrently. Stop
   interrupts affected commands and clears their queued writes. Lifecycle
   transitions fence resource users before releasing connections.
-  Persistent drivers use JSONL; one-shot drivers release temporary clients. Core
+  Persistent drivers use JSONL; one-shot drivers read one `{action,args}` stdin
+  line and release temporary clients. Core
   includes a mock, not a simulator engine. User commands or permission-checked
   model tools control lifecycle; Python tools cannot. `loaded` is intent, not
   readiness; ordinary calls never restart failed services. Stop bypasses approval.
@@ -50,8 +51,12 @@ contract; extraction and a shared default composition module remain deferred.
   preserving posture. Explicit stop clears affected buffers. Background faults
   remain visible through reads. Ownership outlives write calls; cleanup cannot
   stop a replacement owned by another invocation.
-  `world.read` returns `time_s`; `world.wait(duration_s)` returns `time_s` and
-  actual `elapsed_s`. Drivers abstract physical and simulated clocks. Concurrent
+  `world.read` returns `time_s` and optional `budget: {elapsed_s, max_s}`. Budget
+  values are episode time in seconds: finite nonnegative elapsed time and a finite
+  positive allowance, or `max_s: null` for no cap. Drivers own accounting and
+  conversion to seconds; Kinex neither infers a budget nor enforces its allowance.
+  `world.wait(duration_s)` returns only `time_s` and actual `elapsed_s` for that
+  wait. Drivers abstract physical and simulated clocks. Concurrent
   waits share world time and support individual cancellation. Reads never advance
   time. Uncertain writes are never retried automatically.
 - **Frames and calibration.** Frames form a forest; world is optional and missing
@@ -62,28 +67,38 @@ contract; extraction and a shared default composition module remain deferred.
   Calibration writes are validated and planning is read-only. FK/IK uses declared
   geometry or driver solvers; readiness, world bounds and IK do not certify safe
   or collision-free motion.
+  Shared Python pose validation and call-local frame estimates normalize xyzw
+  quaternions only when their norm is within `[0.999, 1.001]`, inclusive.
+  Persisted-profile schemas and velocity-reading validation remain strict.
 - **Tools, skills and Python.** Tools declare schemas, capabilities and timeouts;
   composed calls retain permissions and recording attribution. Skills supply
   procedures. Detection/segmentation feed perception; depth localization respects
   masks and reports camera-relative measurements. `servo` plans from measured
-  joint positions and submits a trajectory segment for `duration_s`, without
-  stopping, settling or arrival checks. Planning rates default to 1 rad/s and
-  3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints, capped by known limits.
-  Short windows truncate the trajectory; long windows hold the goal. Planning
-  does not promise collision avoidance.
+  joint positions and submits a full trajectory at its computed duration, without
+  waiting, stopping, settling or arrival checks. It accepts no duration override;
+  results report computed `duration_s`, requested/IK-resolved target `joints` and
+  final commanded reference `end_joints`, not measured arrival. Planning rates
+  default to 1 rad/s and 3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints,
+  capped by known limits.
+  The Python planner returns references and duration together. Position devices
+  retain the final reference; later writes or stop can interrupt the plan.
+  Planning does not promise collision avoidance.
   `track` composes perceive → process → control → world.wait → optional stop → until.
   Each stage references a tool or supplies inline Python: a lambda or source
   defining `main`, called with keyword arguments and returning JSON data.
   Inline calls bypass discovery and use fresh subprocesses with the caller's
-  interpreter, working directory, cancellation and deadline. Parameters and
-  results use the existing JSONL pipes. Only inline control has controller
-  capabilities; other inline stages have perception capabilities.
+  interpreter, working directory, cancellation and deadline. Python tools consume
+  an initial `{args,source?}` stdin line before RPC; inline source and arguments
+  never travel in argv. Results use the existing JSONL pipes. Only inline control
+  has controller capabilities; other inline stages have perception capabilities.
   Process returns a dict directly; optional process/control inputs map JSON
   Pointers from the previous result into arguments. Nulls are misses; absent paths
   are errors. It passes context and predicate state explicitly. `stop_after_control` defaults
   false; misses, errors, cancellation and final exit stop owned motion.
-  `settled` checks joint error, quiet velocity and stable world time, with an
-  optional world-time timeout. `device` and `devices` share execution; batches
+  `track.wait_s` sets the observation/replanning interval; each control call may
+  replace the remaining references, and exit or `stop_after_control` may interrupt
+  the plan. `settled` checks joint error, quiet velocity and stable world time,
+  with an optional world-time timeout. `device` and `devices` share execution; batches
   authorize before dispatch, preserve result order and report per-entry failures.
   Python composition retains capability restrictions and forbids lifecycle changes.
   `run_policy` infers once, converts Cartesian actions using frozen frames and

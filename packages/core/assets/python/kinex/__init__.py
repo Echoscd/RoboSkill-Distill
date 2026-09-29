@@ -1,8 +1,9 @@
 """Client library for kinex python tools (perception / controller).
 
-A python tool is spawned as   <interpreter> tool.py '<json args>'   and holds a
-JSON-lines dialog with the harness: one request object per stdout line, one
-response object per stdin line, strictly sequential. This module owns that
+A python tool is spawned as <interpreter> tool.py and receives {"args": {...}}
+on its first stdin line. It then holds a JSON-lines dialog with the harness:
+one request object per stdout line, one response object per stdin line, strictly
+sequential. This module owns that
 protocol so tool code stays plain python:
 
     from kinex import args, device, call, profile, robot, finish, fail
@@ -33,9 +34,18 @@ import time
 # Outside a dialog (a skill script or driver importing kinex.geometry) the
 # import stays side-effect-free and any protocol call raises instead.
 _out = None
+_request = None
 if os.environ.get("KINEX_TOOL_DIALOG") == "1":
+    os.environ.pop("KINEX_TOOL_DIALOG")
     _out = os.fdopen(os.dup(sys.stdout.fileno()), "w")
     sys.stdout = sys.stderr
+    # Consume startup before any RPC reads stdin, even if args() is never called.
+    line = sys.stdin.readline()
+    if not line:
+        raise RuntimeError("missing tool startup request")
+    _request = json.loads(line)
+    if not isinstance(_request, dict) or not isinstance(_request.get("args"), dict):
+        raise ValueError("tool startup request requires object args")
 
 
 def _emit(payload):
@@ -58,7 +68,9 @@ def _rpc(payload):
 
 
 def args():
-    """The tool's arguments, parsed from argv."""
+    """The tool's arguments from its startup request."""
+    if _request is not None:
+        return _request["args"]
     return json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
 
 

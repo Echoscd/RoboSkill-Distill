@@ -86,11 +86,23 @@ Actuator writes submit validated buffers with `duration_s` and return immediatel
 Devices consume them at their fixed cadence. Position devices retain the last
 reference; velocity devices expire to zero velocity while retaining posture.
 `world.read` returns `time_s`; `world.wait(duration_s)` waits on the driver's clock.
+Reads may also include `budget: {elapsed_s, max_s}`: episode time consumed and
+allowed, in seconds. `elapsed_s` is finite and nonnegative; `max_s` is finite and
+positive, or `null` for no cap. Omission means the driver supplies no budget.
+The information is reported as supplied, even if elapsed time exceeds the allowance;
+Kinex does not infer it from `time_s`, enforce it, or change control behavior.
+Wait results remain `{time_s, elapsed_s}`, with elapsed time for that wait only.
+Drivers must convert native counts to seconds before reporting a budget. Legacy
+`used`, `max` and `unit` members are rejected, as are malformed budget objects.
 
-- `servo` plans and submits a joint trajectory segment from measured state. It
-  accepts joints or a pose, without waiting for arrival. Short durations truncate
-  the trajectory; longer durations hold the goal. Planning defaults are 1 rad/s
-  and 3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints, capped by known limits.
+- `servo` plans and submits a full joint trajectory from measured state. It
+  accepts joints or a pose and returns immediately, with no duration input.
+  Results report computed `duration_s`, requested/IK-resolved target `joints`, and
+  final commanded reference `end_joints`. Continuous-joint references may differ
+  from the target by a full revolution. These are plan information, not measured
+  arrival: allow execution with `world.wait` and verify using feedback. Planning
+  defaults are 1 rad/s and 3 rad/s², or 0.1 m/s and 0.3 m/s² for linear joints,
+  capped by known limits. Lower `speedFraction` lengthens the computed duration.
 - `run_policy` infers once, splits the selected chunk across devices, and submits
   buffers concurrently. Cartesian `pose` and `pose_delta` actions use frozen
   reference frames and seeded IK; `target_frame` must be rigidly attached to the
@@ -101,6 +113,10 @@ reference; velocity devices expire to zero velocity while retaining posture.
   is `[x,y,z,qx,qy,qz,qw]` in metres with a unit quaternion, defaulting to identity.
   Both local transforms participate. The result expresses child in parent and
   includes `translation`, `rotation`, `pose`, `path` and `estimated_links`.
+  Shipped joint IK, `servo`, `run_policy` and `relative_pose` normalize xyzw
+  quaternions with norms in `[0.999, 1.001]`, including frame estimates. Values
+  outside that range are rejected with the received norm. Persisted profiles
+  and velocity readings retain their stricter validation.
 - `track` composes perceive → process → control → world.wait → optional stop → until.
   Process receives `observation` and returns a dict that overrides `control.args`.
   Optional `inputs` on process/control maps destination argument JSON Pointers
@@ -118,7 +134,7 @@ call("track", world="world", wait_s=0.1,
      perceive={"tool": "target_pose"},
      process={"tool": "relative_pose", "args": {"parent": {"frame": "arm"}},
               "inputs": {"/child/frame": "/frame", "/child/pose": "/pose"}},
-     control={"tool": "servo", "args": {"device": "arm", "duration_s": 0.2},
+     control={"tool": "servo", "args": {"device": "arm"},
               "inputs": {"/pose": "/pose"}},
      until={"tool": "settled", "args": {"timeout_s": 10}})
 ```
@@ -134,6 +150,14 @@ requesting controller capability requires a controller caller.
 Track stops owned motion on misses, errors, cancellation and final exit.
 `stop_after_control` also stops it after each round's wait. Cleanup cannot stop
 another invocation's replacement. Uncertain writes are never retried.
+`wait_s` is the observation/replanning interval; a new control call can replace
+the remaining references of a full servo plan before it completes.
+
+Migration: remove `duration_s` from servo arguments; obsolete input is rejected.
+The Python `kinex.trajectory.trajectory(...)` helper also removes its `duration_s`
+keyword and now returns a `Trajectory` dataclass instead of a reference list.
+Use `plan.actions` and `plan.duration_s` together when submitting a device write.
+Device writes and `run_policy` retain their existing duration contracts.
 
 ## Public runtime
 
@@ -208,6 +232,20 @@ neither Python nor uv. Missing packages report errors without automatic installa
 or replay of the failed tool.
 
 ## Development
+
+Python tools receive one startup JSON line on stdin: `{"args": {...}}`, with
+`"source": "..."` added for inline Python. The client consumes it before any RPC;
+tool code continues to use `kinex.args()`. One-shot drivers receive
+`{"action": "read", "args": {...}}` followed by EOF; `kinex.driver_protocol.run`
+handles this and the existing persistent protocol. Custom scripts parsing payloads
+from `sys.argv` must migrate to these helpers. Executable paths and `--serve` stay
+in argv; payload size no longer selects a transport.
+
+Images stay in files. For example, perception can return
+`{"image": device("camera")["file"]}`; with an identity processing stage, the
+controller mapping `"inputs": {"/observation/images/0": "/image"}` passes the
+current file path each round. Consumers open the file, and image tools can display
+it to the model. No image bytes need to appear in generated tool arguments.
 
 From the repository root:
 

@@ -6,13 +6,16 @@ description: World clock and optional spatial reference.
 
 ## Use
 
-`read()` returns `{time_s}`. `wait({duration_s})` waits in world time and returns
-`{time_s, elapsed_s}`. Waits are concurrent and individually cancellable.
-The driver abstracts the clock; callers do not select an execution mode.
+`read()` returns `time_s` and optional `budget: {elapsed_s, max_s}`: episode seconds
+consumed and allowed. `max_s: null` means no cap. Budget is informational;
+Kinex does not enforce it.
 
-World geometry is optional. Bounds and posed surfaces are informational;
-they do not constrain motion or imply transforms between disconnected frame trees.
-Named frames are fixed; `null` live transforms are not supported on world.
+`wait({duration_s})` waits in world time and returns `{time_s, elapsed_s}`;
+`elapsed_s` is the actual duration of that wait. Waits are concurrent and
+individually cancellable.
+
+Optional bounds and surfaces are informational: they do not constrain motion
+or establish transforms between disconnected frame trees.
 
 ## Setup
 
