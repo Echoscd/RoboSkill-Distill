@@ -293,7 +293,7 @@ test('cancelling a controller before motion does not stop unowned devices', { ti
   t.after(() => abort.abort())
   const pending = runtime.tools.call('track', {
     perceive: { tool: 'slow_point' }, process: { tool: 'relative_pose', args: { parent: { frame: 'arm' } }, inputs: { '/child': '' } },
-    control: { tool: 'servo', args: { device: 'arm', duration_s: 1 } },
+    control: { tool: 'servo', args: { device: 'arm' } },
     world: 'world', wait_s: .1, until: { tool: 'settled' },
   }, { sessionID: 's', signal: AbortSignal.any([abort.signal, AbortSignal.timeout(5000)]) })
   const settled = pending.then(result => ({ result }), error => ({ error }))
@@ -522,12 +522,12 @@ test('native motion stop failures preserve progress and fence subsequent command
 })
 
 
-test('servo submits through the runtime and world.wait executes its buffer', async t => {
+test('servo validates inputs and submits complete, replaceable plans through the runtime', async t => {
   const { runtime, directory } = await fixture(t, { host })
   await runtime.profiles.writeDevice({ name: 'world', type: 'world', loaded: true, access: { connection: { kind: 'mock' } } })
   await runtime.profiles.writeDevice({ name: 'arm', type: 'joint', loaded: true,
     access: { connection: { kind: 'mock' } }, intrinsics: {
-      model: { format: 'joints', joints: [{ name: 'j0', type: 'revolute', limits: { min: -2, max: 2 }, max_velocity: 1, max_acceleration: 2, max_effort: null }] },
+      model: { format: 'joints', joints: [0, 1].map(i => ({ name: `j${i}`, type: 'revolute', limits: { min: -3, max: 3 }, max_velocity: 1, max_acceleration: 3, max_effort: null })) },
       home: null, control: { mode: 'position' },
       feedback: { velocities: true, efforts: false, clock: 'simulation' },
       stop: { behavior: 'hold', affected_devices: ['arm'] },
@@ -539,13 +539,46 @@ test('servo submits through the runtime and world.wait executes its buffer', asy
     const source = await readFile(new URL(`../assets/builtin/tool/servo/${name}`, import.meta.url), 'utf8')
     await writeFile(path.join(dir, name), source + (name.endsWith('yaml') ? '\ninterpreter: python3\n' : ''))
   }
-  const response = await runtime.tools.call('servo', { device: 'arm', joints: [.2], duration_s: 3 }, { sessionID: 's' })
+  const events = []
+  t.after(runtime.subscribe(({ type, event }) => { if (type === 'device') events.push(event) }))
+  const obsolete = await runtime.tools.call('servo', { device: 'arm', joints: [2, 1], duration_s: 2.5 }, { sessionID: 's' })
+  assert.equal(obsolete.isError, true)
+  assert.match(obsolete.output, /duration_s/)
+  assert.ok(!events.some(event => event.action === 'write'))
+  const response = await runtime.tools.call('servo', { device: 'arm', joints: [2, 1] }, { sessionID: 's' })
   assert.ok(!response.isError, response.output)
   const result = JSON.parse(response.output)
-  assert.deepEqual(result.joints, [.2])
-  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [0])
-  await runtime.devices.dispatch('world', 'wait', { duration_s: 3 })
-  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [.2])
+  assert.deepEqual(result.joints, [2, 1])
+  assert.deepEqual(result.end_joints, [2, 1])
+  assert.equal(result.duration_s, 3.75)
+  assert.equal(result.actions_submitted, 375)
+  assert.deepEqual(result.write.state.positions, [0, 0])
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [0, 0])
+  assert.ok(!events.some(event => event.action === 'wait' || event.action === 'stop'))
+  await runtime.devices.dispatch('world', 'wait', { duration_s: 2.5 })
+  const midway = (await runtime.devices.dispatch('arm', 'read')).data.positions
+  assert.ok(Math.abs(midway[0] - 1.5802469135802466) < 1e-12)
+  await runtime.devices.dispatch('world', 'wait', { duration_s: result.duration_s - 2.5 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [2, 1])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: 10 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [2, 1])
+
+  const submit = async joints => {
+    const response = await runtime.tools.call('servo', { device: 'arm', joints }, { sessionID: 's' })
+    assert.ok(!response.isError, response.output)
+    return JSON.parse(response.output)
+  }
+  await submit([0, 0])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: .1 })
+  const replacement = await submit([1, .5])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: replacement.duration_s + 10 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, [1, .5])
+  const interrupted = await submit([0, 0])
+  await runtime.devices.dispatch('world', 'wait', { duration_s: .1 })
+  await runtime.devices.dispatch('arm', 'stop')
+  const stopped = (await runtime.devices.dispatch('arm', 'read')).data.positions
+  await runtime.devices.dispatch('world', 'wait', { duration_s: interrupted.duration_s + 10 })
+  assert.deepEqual((await runtime.devices.dispatch('arm', 'read')).data.positions, stopped)
 })
 
 async function trackingFixture(t) {

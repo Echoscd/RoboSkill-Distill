@@ -40,6 +40,8 @@ Every sweep step moves TOWARD AN UNKNOWN HARD STOP:
 - surroundings clear, payload removed, user at the e-stop with hands clear;
 - ONE joint at a time: small angular steps for revolute joints (2–5°, sent in radians),
   small linear steps for prismatic joints (sent in metres). Use servo with speedFraction 0.05;
+  it submits the full step and returns immediately with computed duration_s. Allow
+  execution with world.wait and check measured arrival before the next step;
 - confirm with the user every few steps; stop the direction the moment they say "near the
   stop", a fault appears, or a step does not reach its target;
 - the user watches for SELF-COLLISION near limits (elbow into base, wrist into forearm).

@@ -6,7 +6,7 @@ parameters:
   additionalProperties: false
   properties:
     world: {type: string, description: World clock device.}
-    wait_s: {type: number, exclusiveMinimum: 0, description: World seconds to wait after each control call.}
+    wait_s: {type: number, exclusiveMinimum: 0, description: 'Observation/replanning interval in world seconds after each control call. The next call may replace a pending trajectory before it completes.'}
     stop_after_control: {type: boolean, default: false, description: Stop owned motion after each wait.}
     perceive:
       oneOf: &call

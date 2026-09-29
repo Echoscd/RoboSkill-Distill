@@ -1,14 +1,18 @@
 # Current work
 
-Expose an optional episode budget in seconds on world reads on `dev`.
+`dev` is the long-lived integration branch for combined fixes. Its PR to `main`
+collects those changes; individual fix branches integrate into `dev`.
 
-- [x] Validate optional `budget: {elapsed_s, max_s}` on reads only.
-- [x] Verify model-visible results, validation and unchanged wait behavior.
-- [x] Document the informational contract and driver-owned conversion to seconds.
-- [x] Run typecheck, standalone tests and core tests sequentially.
+- [x] Make servo submit full planned trajectories and report computed duration.
+- [x] Expose optional `budget: {elapsed_s, max_s}` in seconds on world reads only.
+- [x] Migrate callers and documentation; cover execution, interruption, budget
+  validation and model-visible results with regression tests.
+- [x] Validate the combined changes with typecheck, standalone tests and core tests.
 
-Validation complete: typecheck passed, 53 standalone tests passed, and 97 core
-tests passed. Runtime verification used temporary Python world drivers.
+Combined validation passed: typecheck, 53 standalone tests and 99 core tests.
+Execution tests used mock devices and temporary Python drivers.
 
-RoboEnv must report this seconds-based shape; its legacy count/unit budget is not
-converted by Kinex. Provider changes and native plugin snapshots are separate.
+Servo returns immediately; physical arrival still requires measured feedback.
+RoboEnv must report budget values already converted to seconds; Kinex does not
+convert legacy count/unit budgets or enforce the allowance. Provider changes and
+native plugin snapshots remain separate updates.

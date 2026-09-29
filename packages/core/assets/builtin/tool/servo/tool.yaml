@@ -1,6 +1,6 @@
 name: servo
 kind: controller
-description: "Plan and submit one joint trajectory segment. Returns immediately; use world.wait to allow execution."
+description: "Plan and submit a full joint trajectory. Returns immediately with computed duration_s, requested/IK-resolved target joints and final commanded reference end_joints; these do not confirm arrival. Use world.wait to allow execution and measured feedback to verify arrival. Later writes or stop can interrupt the plan."
 parameters:
   type: object
   additionalProperties: false
@@ -25,7 +25,7 @@ parameters:
       type: number
       exclusiveMinimum: 0
       maximum: 1
-      description: "Fraction of resolved planning velocity and acceleration rates."
+      description: "Fraction of resolved planning velocity and acceleration rates. Lower fractions lengthen the computed duration_s."
     max_velocity:
       oneOf:
       - {type: number, exclusiveMinimum: 0}
@@ -36,14 +36,10 @@ parameters:
       - {type: number, exclusiveMinimum: 0}
       - {type: array, items: {type: number, exclusiveMinimum: 0}, minItems: 1}
       description: "Planning rate in model order; defaults to 3 rad/s² or 0.3 m/s², capped by known limits. Defaults are tool policy, not hardware ratings."
-    duration_s:
-      type: number
-      exclusiveMinimum: 0
-      description: "Trajectory segment duration in world seconds."
-  required: [device, duration_s]
+  required: [device]
   oneOf:
-  - {type: object, additionalProperties: false, properties: *fields, required: [device, duration_s, joints]}
-  - {type: object, additionalProperties: false, properties: *fields, required: [device, duration_s, pose]}
+  - {type: object, additionalProperties: false, properties: *fields, required: [device, joints]}
+  - {type: object, additionalProperties: false, properties: *fields, required: [device, pose]}
 timeout_s: 600
 device_inputs:
   device:
