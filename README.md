@@ -318,6 +318,11 @@ GitHub CI checks types, core and standalone, including PTY interaction and packa
 relocation. CI uses `.nvmrc` and Python 3.12; no physical devices or paid models.
 
 A `v*` tag must match the standalone and core versions and their exact dependency.
+Before tagging, update both package manifests, the exact `@kinex/core` dependency,
+lockfile, CLI version and installation examples. Run
+`node script/release.mjs --check --tag v0.9.0`, complete the checks above, and commit
+the version changes before creating the tag. Release CI reads the tagged commit;
+rerunning an existing tag does not pick up later commits.
 Release CI publishes two npm tarballs plus `SHA256SUMS` as GitHub assets. It does
 not publish to npm or bundle Node. Routine builds/tests publish nothing.
 
