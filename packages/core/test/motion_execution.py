@@ -1,9 +1,12 @@
-"""Exercise trajectory duration and planning limits."""
+"""Exercise pose validation, trajectory duration and planning limits."""
 
 import copy
+import json
 import math
+import random
 import unittest
 
+from kinex.motion import pose, quaternion
 from kinex.trajectory import trajectory, planning_limits
 
 
@@ -15,6 +18,105 @@ PROFILE = {
         "feedback": {"velocities": True, "efforts": False},
     },
 }
+
+
+class QuaternionTests(unittest.TestCase):
+    def test_rounded_quaternions_preserve_position_direction_sign_and_input(self):
+        for rotation in ([.964, .264, .032, .011], [0, 0, .707, .707]):
+            for sign in (1, -1):
+                original = [.2, -.1, .95] + [sign * component for component in rotation]
+                before = original.copy()
+                result = pose(original)
+                norm = math.hypot(*original[3:])
+                self.assertEqual(result[:3], original[:3])
+                self.assertAlmostEqual(math.hypot(*result[3:]), 1, places=15)
+                for actual, component in zip(result[3:], original[3:]):
+                    self.assertAlmostEqual(actual * norm, component, places=15)
+                result[0] = 99
+                self.assertEqual(original, before)
+
+    def test_norm_bounds_are_inclusive_and_adjacent_outside_values_are_rejected(self):
+        for norm in (.999, math.nextafter(.999, 1), 1, math.nextafter(1.001, 1), 1.001):
+            for sign in (1, -1):
+                with self.subTest(norm=norm, sign=sign):
+                    self.assertEqual(quaternion([0, 0, 0, sign * norm]), [0, 0, 0, sign])
+        for norm in (math.nextafter(.999, 0), math.nextafter(1.001, math.inf), .99, 1.01, 0):
+            with self.subTest(norm=norm), self.assertRaises(ValueError) as caught:
+                quaternion([0, 0, 0, norm], "goal")
+            message = str(caught.exception)
+            self.assertIn("goal requires a unit quaternion [qx, qy, qz, qw] (xyzw)", message)
+            self.assertIn(f"got norm {norm!r}", message)
+            self.assertIn("within 0.001 of 1", message)
+        with self.assertRaises(ValueError):
+            quaternion([.71, 0, 0, .71])  # Two-decimal rounding can exceed the tolerance.
+
+    def test_invalid_quaternions_and_poses_are_rejected(self):
+        for value in (None, {}, [], [0, 0, 1], [0, 0, 0, 0, 1], (0, 0, 0, 1),
+                      [0, 0, 1.57, 0], [.1, .2, .3, .9],
+                      *([0, 0, 0, v] for v in (True, False, "1", math.nan, math.inf, -math.inf))):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                quaternion(value)
+        for value in ([0] * 7, [0] * 6, [0] * 8,
+                      *([v, 0, 0, 0, 0, 0, 1] for v in (True, "0", math.nan, math.inf))):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                pose(value)
+
+    def test_full_precision_geometry_and_json_round_trips_remain_unit(self):
+        from kinex.geometry import mat_to_quat, quat_to_mat
+
+        rng = random.Random(0)
+        for _ in range(100):
+            rotation = mat_to_quat(quat_to_mat([rng.gauss(0, 1) for _ in range(4)]))
+            result = pose(json.loads(json.dumps([.1, .2, .3] + rotation)))
+            self.assertAlmostEqual(math.hypot(*result[3:]), 1, places=15)
+            for actual, expected in zip(result[3:], rotation):
+                self.assertAlmostEqual(actual, expected, places=15)
+
+    def test_joint_ik_normalizes_goals_and_retains_fk_residual_verification(self):
+        from kinex.joints import JointDevice
+
+        joint = {"name": "j", "type": "revolute", "limits": {"min": -2, "max": 2},
+                 "max_velocity": 1, "max_effort": None}
+        arm = JointDevice({"type": "joint", "intrinsics": {
+            "model": {"format": "joints", "joints": [joint], "chain": [
+                {"origin": [0, 0, 0, 0, 0, 0, 1], "joint": 0, "axis": [0, 0, 1],
+                 "anchor": [0, 0, 0], "reference": 0},
+                {"origin": [1, 0, 0, 0, 0, 0, 1]}]},
+            "home": None, "kinematics": {"frame": "tip", "fk": "numerical", "feedback": "fk", "ik": {
+                "backend": "numerical", "max_iterations": 100, "damping": 1e-3,
+                "frame_to_solver": [0, 0, 0, 0, 0, 0, 1],
+                "position_tolerance_m": 1e-3, "rotation_tolerance_rad": 1e-3}}}})
+        target = [.878, .479, 0, 0, 0, .247, .969]  # FK at 0.5 rad, rounded to 3 decimals.
+        self.assertAlmostEqual(arm.ik(target, [0])["joints"][0], .5, delta=2e-3)
+
+        def native_ik(goal, seed):
+            self.assertEqual(goal[:3], target[:3])
+            self.assertAlmostEqual(math.hypot(*goal[3:]), 1, places=15)
+            return [.5]
+
+        arm.options["backend"] = "driver"
+        arm.native_ik = native_ik
+        self.assertEqual(arm.ik(target, [0])["joints"], [.5])
+        arm.native_ik = lambda goal, seed: [0]
+        with self.assertRaisesRegex(ValueError, "IK result failed FK residual verification"):
+            arm.ik(target, [0])
+
+    def test_velocity_pose_and_frame_readings_keep_strict_validation(self):
+        from kinex.velocity import reading
+
+        profile = {"type": "velocity", "intrinsics": {"frames": {"camera": None}, "feedback": {
+            "velocity_components": [], "velocity_frame": None, "pose_frame": "world", "clock": "simulation"}}}
+        sample = {"pose": {"translation_m": [0, 0, 0], "rotation_xyzw": [0, 0, 0, 1]},
+                  "velocities": [], "faults": [], "sample_time_s": 0,
+                  "frame_poses": {"camera": [0, 0, 0, 0, 0, 0, 1]}}
+        self.assertEqual(reading(profile, sample), sample)
+        sample["pose"]["rotation_xyzw"] = [0, 0, 0, .9995]
+        with self.assertRaisesRegex(ValueError, "unit norm"):
+            reading(profile, sample)
+        sample["pose"]["rotation_xyzw"] = [0, 0, 0, 1]
+        sample["frame_poses"]["camera"][-1] = .9995
+        with self.assertRaisesRegex(ValueError, "Unit quaternion"):
+            reading(profile, sample)
 
 
 class MotionTests(unittest.TestCase):

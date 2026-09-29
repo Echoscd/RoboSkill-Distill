@@ -10,11 +10,25 @@ import math
 from kinex.geometry import compose_rt, invert_rt, mat_to_quat, xyzq_to_rt
 
 
+# Four components rounded to three decimals can change the norm by up to 0.001.
+QUATERNION_NORM_TOLERANCE = 1e-3
+
+
+def quaternion(value, name="quaternion"):
+    """Return a near-unit [qx, qy, qz, qw] quaternion scaled to unit norm."""
+    vector(value, 4, name)
+    norm = math.hypot(*value)
+    # Compare bounds directly so the endpoints survive floating-point rounding.
+    if not 1 - QUATERNION_NORM_TOLERANCE <= norm <= 1 + QUATERNION_NORM_TOLERANCE:
+        raise ValueError(f"{name} requires a unit quaternion [qx, qy, qz, qw] (xyzw); got norm {norm!r} "
+                         f"(norms within {QUATERNION_NORM_TOLERANCE:g} of 1 are normalized)")
+    return [component / norm for component in value]
+
+
 def pose(value, name="pose"):
+    """Return [x, y, z, qx, qy, qz, qw] with a normalized near-unit quaternion."""
     vector(value, 7, name)
-    if abs(sum(v * v for v in value[3:]) - 1) > 1e-5:
-        raise ValueError(f"{name} requires a unit quaternion xyzw")
-    return value
+    return value[:3] + quaternion(value[3:], name)
 
 
 def flat(rt):

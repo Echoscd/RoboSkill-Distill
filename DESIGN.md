@@ -67,6 +67,9 @@ contract; extraction and a shared default composition module remain deferred.
   Calibration writes are validated and planning is read-only. FK/IK uses declared
   geometry or driver solvers; readiness, world bounds and IK do not certify safe
   or collision-free motion.
+  Shared Python pose validation and call-local frame estimates normalize xyzw
+  quaternions only when their norm is within `[0.999, 1.001]`, inclusive.
+  Persisted-profile schemas and velocity-reading validation remain strict.
 - **Tools, skills and Python.** Tools declare schemas, capabilities and timeouts;
   composed calls retain permissions and recording attribution. Skills supply
   procedures. Detection/segmentation feed perception; depth localization respects

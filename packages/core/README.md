@@ -113,6 +113,10 @@ Drivers must convert native counts to seconds before reporting a budget. Legacy
   is `[x,y,z,qx,qy,qz,qw]` in metres with a unit quaternion, defaulting to identity.
   Both local transforms participate. The result expresses child in parent and
   includes `translation`, `rotation`, `pose`, `path` and `estimated_links`.
+  Shipped joint IK, `servo`, `run_policy` and `relative_pose` normalize xyzw
+  quaternions with norms in `[0.999, 1.001]`, including frame estimates. Values
+  outside that range are rejected with the received norm. Persisted profiles
+  and velocity readings retain their stricter validation.
 - `track` composes perceive → process → control → world.wait → optional stop → until.
   Process receives `observation` and returns a dict that overrides `control.args`.
   Optional `inputs` on process/control maps destination argument JSON Pointers

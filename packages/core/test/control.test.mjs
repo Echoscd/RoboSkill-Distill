@@ -629,6 +629,76 @@ test('relative_pose bridges disconnected frames only with supplied estimates', a
 })
 
 
+test('servo normalizes rounded pose goals before IK and rejects larger norm errors', async () => {
+  const rounded = [.2, 0, .95, .964, .264, .032, .011]
+  for (const frame of [undefined, 'arm']) {
+    const device = arm({ ik: [.1, .2] })
+    const { result, stderr } = await dialog(tool('servo'), { device: 'arm', pose: rounded, ...(frame ? { frame } : {}) }, { arm: device })
+    assert.ok(result, stderr)
+    assert.deepEqual(device.ikArgs.pose.slice(0, 3), rounded.slice(0, 3))
+    const norm = Math.hypot(...rounded.slice(3))
+    device.ikArgs.pose.slice(3).forEach((value, i) => assert.ok(Math.abs(value - rounded[i + 3] / norm) < 1e-12))
+    assert.equal(device.writes, 1)
+    const far = await dialog(tool('servo'), { device: 'arm', pose: [.2, 0, .95, 0, 0, 0, 1.002] }, { arm: device })
+    assert.equal(far.result, undefined)
+    assert.match(far.stderr, /pose requires a unit quaternion \[qx, qy, qz, qw\] \(xyzw\); got norm 1\.002/)
+    assert.match(far.stderr, /within 0\.001 of 1/)
+    assert.equal(device.writes, 1)
+  }
+})
+
+test('relative_pose normalizes local poses and estimates within the same norm bounds', async () => {
+  const camera = arm({}), original = camera.profile
+  camera.profile = () => ({ ...original(), name: 'camera' })
+  const devices = { arm: arm({}), camera }
+  const input = {
+    child: { frame: 'camera', pose: [1, 0, 0, 0, 0, 0, .999] },
+    parent: { frame: 'arm', pose: [0, 0, 0, 0, 0, 0, 1.001] },
+  }
+  const estimate = { child: 'camera', parent: 'arm', translation_m: [0, 1, 0] }
+  for (const rotation of [[0, 0, .707, .707], [0, 0, 0, .999], [0, 0, 0, 1.001]]) {
+    const { result, stderr } = await dialog(tool('relative-pose'), { ...input,
+      estimates: [{ ...estimate, rotation_xyzw: rotation }],
+    }, devices)
+    assert.ok(result, stderr)
+    const norm = Math.hypot(...rotation)
+    result.rotation.forEach((value, i) => assert.ok(Math.abs(value - rotation[i] / norm) < 1e-12))
+    const position = rotation[2] ? [0, 2, 0] : [1, 1, 0]
+    result.translation.forEach((value, i) => assert.ok(Math.abs(value - position[i]) < 1e-12))
+    assert.equal(result.estimated_links, 1)
+  }
+  for (const rotation of [[0, 0, 0, .998], [0, 0, 0, 1.002], [0, 0, 0, 0]]) {
+    const rejected = await dialog(tool('relative-pose'), { ...input,
+      estimates: [{ ...estimate, rotation_xyzw: rotation }],
+    }, devices)
+    assert.equal(rejected.result, undefined)
+    assert.match(rejected.stderr, /estimates\[0\]\.rotation_xyzw requires a unit quaternion/)
+    assert.match(rejected.stderr, /within 0\.001 of 1/)
+  }
+})
+
+test('policy normalizes near-unit absolute pose actions before frame conversion and IK', async () => {
+  for (const rotation of [[0, 0, .707, .707], [0, 0, 0, 1.002]]) {
+    const device = cartesianArm()
+    const { result, stderr } = await dialog(tool('run-policy'), {
+      model: 'policy', observation: {}, command: [{ device: 'arm', space: 'pose' }],
+    }, { arm: device, policy: policy([{ actions: [[.1, .2, 0, ...rotation]] }]) })
+    if (rotation[2]) {
+      assert.ok(result, stderr)
+      assert.equal(device.writes, 1)
+      assert.equal(result.actions_submitted, 1)
+      assert.deepEqual(device.ikArgs.pose.slice(0, 3), [.1, .2, 0])
+      assert.ok(Math.abs(device.ikArgs.pose[5] - Math.SQRT1_2) < 1e-12)
+      assert.ok(Math.abs(device.ikArgs.pose[6] - Math.SQRT1_2) < 1e-12)
+    } else {
+      assert.equal(result, undefined)
+      assert.match(stderr, /got norm 1\.002/)
+      assert.equal(device.solves.length, 0)
+      assert.equal(device.writes, 0)
+    }
+  }
+})
+
 test('native servo accepts measured overshoot and explicit targets beyond model bounds', async () => {
   const device = arm({}), original = device.profile
   device.profile = () => { const value = original(); value.intrinsics.control.limit_handling = 'native'; return value }

@@ -10,10 +10,13 @@ collects those changes; individual fix branches integrate into `dev`.
 - [x] Validate the combined changes with typecheck, standalone tests and core tests.
 - [x] Move tool arguments, inline source and one-shot driver requests to stdin.
 - [x] Cover large payloads, startup ordering, image references and interruption.
+- [x] Normalize near-unit pose quaternions and frame estimates within 0.001;
+  test boundaries, invalid inputs, IK, frame consumers and strict profile checks.
 - [x] Build and pack the combined changes.
 
-Combined validation passed: typecheck, 53 standalone tests and 111 core tests.
-Standalone/core build and local release packaging also passed.
+Combined validation passed: typecheck, 53 standalone tests and 115 core tests,
+including 12 Python motion tests. Standalone/core build and local release
+packaging also passed.
 Execution tests used mock devices and temporary Python drivers.
 Local runtime benchmarks showed no noticeable latency regression for 1 KiB and
 32 KiB requests. Transport documentation stays in developer references; no new
