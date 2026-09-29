@@ -86,6 +86,14 @@ Actuator writes submit validated buffers with `duration_s` and return immediatel
 Devices consume them at their fixed cadence. Position devices retain the last
 reference; velocity devices expire to zero velocity while retaining posture.
 `world.read` returns `time_s`; `world.wait(duration_s)` waits on the driver's clock.
+Reads may also include `budget: {elapsed_s, max_s}`: episode time consumed and
+allowed, in seconds. `elapsed_s` is finite and nonnegative; `max_s` is finite and
+positive, or `null` for no cap. Omission means the driver supplies no budget.
+The information is reported as supplied, even if elapsed time exceeds the allowance;
+Kinex does not infer it from `time_s`, enforce it, or change control behavior.
+Wait results remain `{time_s, elapsed_s}`, with elapsed time for that wait only.
+Drivers must convert native counts to seconds before reporting a budget. Legacy
+`used`, `max` and `unit` members are rejected, as are malformed budget objects.
 
 - `servo` plans and submits a joint trajectory segment from measured state. It
   accepts joints or a pose, without waiting for arrival. Short durations truncate

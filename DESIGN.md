@@ -50,8 +50,12 @@ contract; extraction and a shared default composition module remain deferred.
   preserving posture. Explicit stop clears affected buffers. Background faults
   remain visible through reads. Ownership outlives write calls; cleanup cannot
   stop a replacement owned by another invocation.
-  `world.read` returns `time_s`; `world.wait(duration_s)` returns `time_s` and
-  actual `elapsed_s`. Drivers abstract physical and simulated clocks. Concurrent
+  `world.read` returns `time_s` and optional `budget: {elapsed_s, max_s}`. Budget
+  values are episode time in seconds: finite nonnegative elapsed time and a finite
+  positive allowance, or `max_s: null` for no cap. Drivers own accounting and
+  conversion to seconds; Kinex neither infers a budget nor enforces its allowance.
+  `world.wait(duration_s)` returns only `time_s` and actual `elapsed_s` for that
+  wait. Drivers abstract physical and simulated clocks. Concurrent
   waits share world time and support individual cancellation. Reads never advance
   time. Uncertain writes are never retried automatically.
 - **Frames and calibration.** Frames form a forest; world is optional and missing

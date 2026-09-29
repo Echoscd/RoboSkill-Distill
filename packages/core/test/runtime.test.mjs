@@ -669,6 +669,43 @@ test('cancelling track during processing stops owned motion without stopping its
   assert.equal((await runtime.devices.dispatch('hand', 'read')).data.stopped, true)
 })
 
+test('world read exposes driver time budgets without advancing time or changing waits', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  for (const [name, maximum] of [['bounded', .1], ['unbounded', null], ['absent', undefined]]) {
+    await runtime.profiles.writeDevice({ name, type: 'world', loaded: false,
+      access: { connection: { kind: 'process' }, driver: {
+        interpreter: 'python3', persistent: true, actions: ['read', 'wait', 'load', 'unload', 'status'],
+      } } })
+    await writeFile(path.join(directory, `.kinex/devices/${name}/driver.py`), `from kinex.driver_protocol import run
+elapsed = 0.0
+def dispatch(action, args):
+    global elapsed
+    if action not in ('read', 'wait'):
+        return {'ok': True, 'loaded': action != 'unload'}
+    duration = args.get('duration_s', 0)
+    if action == 'wait':
+        elapsed += duration
+    budget = ${maximum === undefined ? '{}' : `{'budget': {'elapsed_s': elapsed, 'max_s': ${maximum === null ? 'None' : maximum}}}`}
+    return {'ok': True, 'time_s': 1000 + elapsed, 'elapsed_s': duration, 'extra': True, **budget}
+run(dispatch, lambda: None)
+`)
+    await (await runtime.devices.load(name)).ready
+    const expected = elapsed_s => ({ time_s: 1000 + elapsed_s,
+      ...(maximum === undefined ? {} : { budget: { elapsed_s, max_s: maximum } }) })
+    for (const verbose of [true, false]) for (const compact of [true, false]) {
+      const response = await runtime.tools.call('device', { deviceID: name, action: 'read', verbose, compact }, { sessionID: 's' })
+      assert.ok(!response.isError, response.output)
+      assert.deepEqual(JSON.parse(response.output), expected(0))
+    }
+    for (const time_s of [1000.25, 1000.5]) {
+      const wait = await runtime.tools.call('device', { deviceID: name, action: 'wait', args: { duration_s: .25 } }, { sessionID: 's' })
+      assert.ok(!wait.isError, wait.output)
+      assert.deepEqual(JSON.parse(wait.output), { time_s, elapsed_s: .25 })
+      assert.deepEqual((await runtime.devices.dispatch(name, 'read')).data, expected(time_s - 1000))
+    }
+  }
+})
+
 test('cancelling one world wait leaves concurrent waits and the driver usable', async t => {
   const { runtime, directory } = await fixture(t)
   await runtime.profiles.writeDevice({ name: 'world', type: 'world', loaded: false,
