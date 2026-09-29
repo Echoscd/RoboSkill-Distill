@@ -78,7 +78,7 @@ def run(dispatch, cleanup, *, serving=None):
     """Serve correlated requests; observations and stop never enter the write queue.
 
     Lifecycle fences all resource users. Capture has its own ordered queue.
-    One-shot clients retain the argv protocol and release temporary resources.
+    One-shot clients send one stdin request and release temporary resources.
     """
     persistent = "--serve" in sys.argv if serving is None else serving
     ready = False
@@ -138,9 +138,13 @@ def run(dispatch, cleanup, *, serving=None):
 
         try:
             if not persistent:
-                action = sys.argv[1] if len(sys.argv) > 1 else "read"
-                args = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
-                output.write(json.dumps(respond(action, args), allow_nan=False) + "\n")
+                line = sys.stdin.readline()
+                if not line:
+                    raise ValueError("missing driver startup request")
+                request = json.loads(line)
+                if not isinstance(request, dict):
+                    raise ValueError("driver startup request must be an object")
+                output.write(json.dumps(respond(request.get("action"), request.get("args")), allow_nan=False) + "\n")
                 output.flush()
                 return
             pools = {name: ThreadPoolExecutor(max_workers=count, thread_name_prefix=name)

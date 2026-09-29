@@ -229,6 +229,20 @@ or replay of the failed tool.
 
 ## Development
 
+Python tools receive one startup JSON line on stdin: `{"args": {...}}`, with
+`"source": "..."` added for inline Python. The client consumes it before any RPC;
+tool code continues to use `kinex.args()`. One-shot drivers receive
+`{"action": "read", "args": {...}}` followed by EOF; `kinex.driver_protocol.run`
+handles this and the existing persistent protocol. Custom scripts parsing payloads
+from `sys.argv` must migrate to these helpers. Executable paths and `--serve` stay
+in argv; payload size no longer selects a transport.
+
+Images stay in files. For example, perception can return
+`{"image": device("camera")["file"]}`; with an identity processing stage, the
+controller mapping `"inputs": {"/observation/images/0": "/image"}` passes the
+current file path each round. Consumers open the file, and image tools can display
+it to the model. No image bytes need to appear in generated tool arguments.
+
 From the repository root:
 
 ```sh

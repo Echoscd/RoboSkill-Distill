@@ -66,8 +66,8 @@ async function validateInputs(cwd: string, info: PyToolInfo, args: Record<string
 const missingDevicesError = (name: string, missing: string[]) =>
   `tool "${name}" requires a loaded device of type ${missing.join(", ")} — none is loaded. /register one or /load an existing device first`
 
-// The tool ↔ harness dialog: the tool process writes one JSON object per line
-// on stdout — either a request {"call": ...} (harness answers with one JSON
+// The harness first sends {args, source?} on stdin. The tool then writes one JSON
+// object per stdout line — either a request {"call": ...} (harness answers with one JSON
 // line on its stdin) or the terminal {"return": ...} / {"error": ...}. Calls
 // are strictly sequential — concurrency lives harness-side: the batched
 // "devices" call dispatches its whole command list at once (Promise.all).
@@ -81,6 +81,7 @@ type MotionContext = Context & { motionOwner: string }
 type PythonExecution = Pick<ToolManifest, "name" | "kind" | "interpreter" | "timeout_s"> & {
   directory: string
   entry: string[]
+  source?: string
 }
 
 function execution(info: PyToolInfo): PythonExecution {
@@ -146,7 +147,7 @@ async function dispatch(cwd: string, info: PythonExecution, request: Request, ct
     const { python, kind, args } = InlineRequest.parse(request)
     if (info.kind === "perception" && kind !== "perception")
       return { ok: false, error: `perception tool "${info.name}" may only compose perception tools` }
-    return composed(invoke(cwd, { ...info, name: "inline", kind, entry: ["-m", "kinex._inline", python] }, args, ctx, depth + 1, ctx.motionOwner))
+    return composed(invoke(cwd, { ...info, name: "inline", kind, entry: ["-m", "kinex._inline"], source: python }, args, ctx, depth + 1, ctx.motionOwner))
   }
   if (call === "tool") {
     const name = request["name"]
@@ -177,7 +178,8 @@ async function invoke(cwd: string, info: PythonExecution, args: Record<string, u
   signal.throwIfAborted()
   const runtime = await pythonLaunch(cwd, "tool", info.interpreter, signal)
   signal.throwIfAborted()
-  const proc = spawnProcess([runtime.executable, ...info.entry, JSON.stringify(args)], {
+  const request = JSON.stringify({ args, source: info.source }) + "\n"
+  const proc = spawnProcess([runtime.executable, ...info.entry], {
     cwd: info.directory,
     stdin: "pipe",
     stdout: "pipe",
@@ -191,7 +193,7 @@ async function invoke(cwd: string, info: PythonExecution, args: Record<string, u
   const source = served.source
   const deadline = Date.now() + info.timeout_s * 1000
 
-  const finished = await (async (): Promise<unknown> => {
+  const dialog = (async (): Promise<unknown> => {
     for (;;) {
       const line = await abortable(readLine(source, deadline), signal).catch((error: unknown) => {
         if (error instanceof LineTimeoutError || (error instanceof Error && error.name === "TimeoutError")) throw new PyToolError("tool timed out")
@@ -228,7 +230,14 @@ async function invoke(cwd: string, info: PythonExecution, args: Record<string, u
       }
       // JSON but neither request nor terminal — tolerate like a stray print.
     }
-  })().finally(async () => {
+  })()
+  // Drain the dialog while sending: a tool may print before importing kinex.
+  proc.stdin.write(request)
+  const sent = abortable(proc.stdin.flush(), signal).catch((error: unknown) => {
+    signal.throwIfAborted()
+    throw new PyToolError(`cannot send tool request: ${error instanceof Error ? error.message : String(error)}`)
+  })
+  const finished = await Promise.all([sent, dialog]).then(([, result]) => result).finally(async () => {
     signal.removeEventListener("abort", onAbort)
     await terminate(served, true)
   }).catch(async (error: unknown) => {

@@ -34,7 +34,8 @@ contract; extraction and a shared default composition module remain deferred.
   Reads run alongside writes; independent devices write concurrently. Stop
   interrupts affected commands and clears their queued writes. Lifecycle
   transitions fence resource users before releasing connections.
-  Persistent drivers use JSONL; one-shot drivers release temporary clients. Core
+  Persistent drivers use JSONL; one-shot drivers read one `{action,args}` stdin
+  line and release temporary clients. Core
   includes a mock, not a simulator engine. User commands or permission-checked
   model tools control lifecycle; Python tools cannot. `loaded` is intent, not
   readiness; ordinary calls never restart failed services. Stop bypasses approval.
@@ -83,9 +84,10 @@ contract; extraction and a shared default composition module remain deferred.
   Each stage references a tool or supplies inline Python: a lambda or source
   defining `main`, called with keyword arguments and returning JSON data.
   Inline calls bypass discovery and use fresh subprocesses with the caller's
-  interpreter, working directory, cancellation and deadline. Parameters and
-  results use the existing JSONL pipes. Only inline control has controller
-  capabilities; other inline stages have perception capabilities.
+  interpreter, working directory, cancellation and deadline. Python tools consume
+  an initial `{args,source?}` stdin line before RPC; inline source and arguments
+  never travel in argv. Results use the existing JSONL pipes. Only inline control
+  has controller capabilities; other inline stages have perception capabilities.
   Process returns a dict directly; optional process/control inputs map JSON
   Pointers from the previous result into arguments. Nulls are misses; absent paths
   are errors. It passes context and predicate state explicitly. `stop_after_control` defaults

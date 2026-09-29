@@ -10,10 +10,9 @@ import { exists } from "../util/filesystem.ts"
 import { serveProcess, terminate, type ServeProcess } from "./serve-process.ts"
 import { isModel, type Device } from "./profile/schema.ts"
 
-// Runs the agent-authored per-device drivers (devices/<name>/driver.py). The
-// full contract — argv form, one-JSON-object stdout, the --serve JSON-lines
-// protocol — is the agent-facing prose in builtin/skill/setup-device/SKILL.md;
-// this file is its harness half.
+// Runs the agent-authored per-device drivers (devices/<name>/driver.py).
+// Requests use stdin JSONL; --serve keeps the connection open with correlated
+// replies. One-shot drivers read one request and release temporary resources.
 
 
 class DriverError extends NamedError {
@@ -284,9 +283,11 @@ async function runOnce(
   const runtime = await pythonLaunch(cwd, "driver", device.access?.driver?.interpreter, signal)
   signal.throwIfAborted()
   admission?.check()
-  const proc = spawnProcess([runtime.executable, file, action, JSON.stringify(args)], {
+  const request = JSON.stringify({ action, args }) + "\n"
+  const proc = spawnProcess([runtime.executable, file], {
     cwd: path.dirname(file),
     group: true,
+    stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
     env: runtime.env,
@@ -295,10 +296,17 @@ async function runOnce(
   signal?.addEventListener("abort", abort, { once: true })
   if (signal?.aborted) abort()
   const timeout = setTimeout(abort, timeoutMs(device))
+  proc.stdin.write(request)
+  proc.stdin.end()
+  const sent = proc.stdin.flush().catch((error: unknown) => {
+    signal.throwIfAborted()
+    throw new DriverError(`cannot send request to driver for "${device.name}": ${error instanceof Error ? error.message : String(error)}`)
+  })
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
     proc.exited,
+    sent,
   ]).finally(() => {
     proc.kill("SIGKILL")
     clearTimeout(timeout)

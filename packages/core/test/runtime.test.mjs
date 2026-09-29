@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, utimes } from 'node:f
 import os from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { createHash } from 'node:crypto'
 const globals = await mkdtemp(path.join(os.tmpdir(), 'kinex-node-home-'))
 process.env.KINEX_CONFIG_DIR = path.join(globals, 'config')
 process.env.KINEX_DATA_DIR = path.join(globals, 'data')
@@ -40,6 +41,104 @@ async function pythonDriver(runtime, directory, persistent = true) {
   await writeFile(path.join(dir, 'driver.py'), driver)
   return dir
 }
+
+async function pythonTool(directory, name, code, kind = 'perception', timeout = 10) {
+  const dir = path.join(directory, '.kinex/tool', name)
+  await mkdir(dir, { recursive: true })
+  await writeFile(path.join(dir, 'tool.yaml'), `name: ${name}\nkind: ${kind}\ndescription: test\ninterpreter: python3\ntimeout_s: ${timeout}\nparameters: {type: object}\n`)
+  await writeFile(path.join(dir, 'tool.py'), code)
+  return dir
+}
+
+test('Python startup carries large Unicode arguments and inline source through nested calls', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  await pythonTool(directory, 'digest', `import hashlib, os, subprocess, sys
+from kinex import args, finish, robot
+robot()  # Must not consume the startup request as an RPC response.
+a = args()
+assert args() == a
+assert len(sys.argv) == 1
+assert 'KINEX_TOOL_DIALOG' not in os.environ
+child = subprocess.run([sys.executable, '-c', 'import kinex; print("ordinary import")'], capture_output=True, text=True, check=True)
+assert child.stdout.strip() == 'ordinary import'
+finish({'length': len(a['value']), 'sha256': hashlib.sha256(a['value'].encode()).hexdigest()})
+`)
+  await pythonTool(directory, 'nested', `from kinex import args, inline, finish
+a = args()
+finish(inline(a['source'], {'value': a['value']}))
+`)
+  const source = `# ${'large source '.repeat(15000)}\nfrom kinex import call\ndef main(value):\n    return call('digest', value=value)\n`
+  for (const value of ['small', 'x'.repeat(3 * 1024 * 1024), '🦾画像'.repeat(100000)]) {
+    for (const name of ['digest', 'nested']) {
+      const response = await runtime.tools.call(name, name === 'nested' ? { value, source } : { value }, { sessionID: 's' })
+      assert.ok(!response.isError, response.output)
+      assert.deepEqual(JSON.parse(response.output), {
+        length: [...value].length, sha256: createHash('sha256').update(value).digest('hex'),
+      })
+    }
+  }
+})
+
+test('one-shot drivers accept large requests, receive EOF and release resources', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  const dir = await pythonDriver(runtime, directory, false)
+  await writeFile(path.join(dir, 'driver.py'), `import hashlib, sys
+from kinex.driver_protocol import run
+def dispatch(action, args):
+    assert len(sys.argv) == 1
+    assert sys.stdin.read() == ''
+    return {'ok': True, 'sha256': hashlib.sha256(args['value'].encode()).hexdigest()}
+def cleanup():
+    with open('closed', 'a') as output: output.write('closed\\n')
+run(dispatch, cleanup)
+`)
+  for (const value of ['small', 'x'.repeat(3 * 1024 * 1024), '🦾画像'.repeat(100000)]) {
+    const result = await runtime.devices.dispatch('sensor', 'read', { value })
+    assert.equal(result.data.sha256, createHash('sha256').update(value).digest('hex'))
+  }
+  assert.equal((await readFile(path.join(dir, 'closed'), 'utf8')).trim().split('\n').length, 3)
+})
+
+test('large startup writes tolerate noisy tools and report early exit', async t => {
+  const { runtime, directory } = await fixture(t, { host })
+  await pythonTool(directory, 'noisy', `import os
+os.write(1, b'diagnostic\\n' * 100000)
+os.write(2, b'diagnostic\\n' * 100000)
+from kinex import args, finish
+finish(len(args()['value']))
+`)
+  const args = { value: 'x'.repeat(3 * 1024 * 1024) }
+  const response = await runtime.tools.call('noisy', args, { sessionID: 's' })
+  assert.ok(!response.isError, response.output)
+  assert.equal(JSON.parse(response.output), args.value.length)
+  await pythonTool(directory, 'exits', 'raise RuntimeError("exit before startup")\n')
+  const exited = await runtime.tools.call('exits', args, { sessionID: 's' })
+  assert.equal(exited.isError, true)
+  assert.match(exited.output, /cannot send tool request|exit before startup/)
+  const dir = await pythonDriver(runtime, directory, false)
+  await writeFile(path.join(dir, 'driver.py'), 'raise RuntimeError("exit before startup")\n')
+  await assert.rejects(runtime.devices.dispatch('sensor', 'read', args), /cannot send request|exit before startup/)
+})
+
+test('blocked startup writes respect cancellation and deadlines', { timeout: 20000 }, async t => {
+  for (const mode of ['cancel', 'timeout']) await t.test(mode, async t => {
+    const { runtime, directory } = await fixture(t, { host })
+    const code = 'import time\ntime.sleep(30)\n'
+    await pythonTool(directory, 'blocked', code, 'perception', 1)
+    const dir = await pythonDriver(runtime, directory, false)
+    await writeFile(path.join(dir, 'driver.py'), code)
+    const args = { value: 'x'.repeat(3 * 1024 * 1024) }
+    const start = Date.now()
+    const result = await runtime.tools.call('blocked', args, { sessionID: 's',
+      ...(mode === 'cancel' ? { signal: AbortSignal.timeout(300) } : {}),
+    })
+    assert.equal(result.isError, true)
+    assert.match(result.output, /abort|interrupt|timed out|timeout/i)
+    await assert.rejects(runtime.devices.dispatch('sensor', 'read', args,
+      mode === 'cancel' ? AbortSignal.timeout(300) : undefined), /abort|timeout|exited|cannot send request/i)
+    assert.ok(Date.now() - start < 8000)
+  })
+})
 
 test('core discovery and context contain robotics tools and packaged assets', async t => {
   const { runtime } = await fixture(t)
@@ -642,6 +741,74 @@ finish({'custom': True})
   const args = { world: 'world', wait_s: .1, until: { tool: 'never' }, perceive: { tool: 'sample' }, process: { tool: 'convert' }, control: { tool: 'act' }, max_misses: 1 }
   return { ...value, args, events }
 }
+
+test('failed large startup writes in composed tools stop owned motion', async t => {
+  const { runtime, directory, events } = await trackingFixture(t)
+  await pythonTool(directory, 'blocked', 'import time\ntime.sleep(30)\n', 'perception', 1)
+  await pythonTool(directory, 'starts', `from kinex import args, device, call, finish
+device('arm', 'write', actions=[[.2]], duration_s=.1)
+finish(call('blocked', value=args()['value']))
+`, 'controller')
+  const result = await runtime.tools.call('starts', { value: 'x'.repeat(3 * 1024 * 1024) }, { sessionID: 's' })
+  assert.equal(result.isError, true)
+  assert.match(result.output, /timeout|timed out/i)
+  assert.deepEqual(events.filter(e => e.action === 'stop').map(e => e.device.name), ['arm'])
+  assert.equal((await runtime.devices.dispatch('arm', 'read')).data.stopped, true)
+})
+
+test('track maps fresh camera file entries to controllers without encoding image bytes', async t => {
+  const { runtime, directory, args } = await trackingFixture(t)
+  const dir = await pythonDriver(runtime, directory, false)
+  await writeFile(path.join(dir, 'source.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=', 'base64'))
+  await writeFile(path.join(dir, 'driver.py'), `from pathlib import Path
+import uuid
+from kinex.driver_protocol import run
+def dispatch(action, args):
+    frame = Path(str(uuid.uuid4()) + '.png').resolve()
+    frame.write_bytes(Path('source.png').read_bytes())
+    return {'ok': True, 'file': str(frame)}
+run(dispatch, lambda: None)
+`)
+  const image = await runtime.tools.call('device', { deviceID: 'sensor' }, { sessionID: 's' })
+  assert.ok(!image.isError, image.output)
+  assert.equal(image.attachments[0].mime, 'image/png')
+  const result = await runtime.tools.call('track', { ...args, max_rounds: 2,
+    perceive: { python: 'from kinex import device\ndef main():\n    return {"image": device("sensor")["file"]}\n' },
+    process: { python: 'lambda observation: observation' },
+    control: { python: `from pathlib import Path
+def main(observation):
+    image = observation['images'][0]
+    assert Path(image).read_bytes().startswith(b'\\x89PNG')
+    return image
+`, inputs: { '/observation/images/0': '/image' } },
+    until: { python: 'lambda context, state: {"done": False, "state": (state or []) + ([context["control_result"]] if context["round"] else [])}' },
+  }, { sessionID: 's' })
+  assert.ok(!result.isError, result.output)
+  const value = JSON.parse(result.output)
+  assert.equal(new Set(value.until_state).size, 2)
+  assert.equal(value.last, value.until_state[1])
+  for (const file of value.until_state) assert.deepEqual(await readFile(file), await readFile(path.join(dir, 'source.png')))
+})
+
+test('track passes large generated observations through stages and predicate context', async t => {
+  const { runtime, args } = await trackingFixture(t)
+  const result = await runtime.tools.call('track', { ...args,
+    perceive: { python: 'lambda: {"samples": list(range(60000))}' },
+    process: { python: 'lambda observation: observation' },
+    control: { python: 'lambda samples: {"count": len(samples)}' },
+    until: { python: `def main(context, state):
+    if not context['round']:
+        return {'done': False}
+    assert context['observation']['samples'] == list(range(60000))
+    assert context['control_args']['samples'] == context['observation']['samples']
+    return {'done': True, 'state': context['control_result']['count']}
+` },
+  }, { sessionID: 's' })
+  assert.ok(!result.isError, result.output)
+  assert.deepEqual(JSON.parse(result.output), {
+    terminated_by: 'until', rounds: 1, perception_misses: 0, last: { count: 60000 }, until_state: 60000,
+  })
+})
 
 test('track stops owned actuators on misses and errors, excluding model inference and unrelated motion', async t => {
   for (const mode of ['model', 'fail']) {

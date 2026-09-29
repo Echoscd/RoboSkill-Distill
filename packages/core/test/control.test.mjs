@@ -62,9 +62,10 @@ function policy(chunks) {
 // The tool<->harness dialog: one JSON request per stdout line, one reply per stdin line.
 function dialog(file, callArgs, devices, tools = {}, owned = new Set()) {
   return new Promise((resolve) => {
-    const proc = spawn(python, [file, JSON.stringify(callArgs)], {
+    const proc = spawn(python, [file], {
       env: { ...process.env, KINEX_TOOL_DIALOG: '1', PYTHONPATH: pythonLib },
     })
+    proc.stdin.write(JSON.stringify({ args: callArgs }) + '\n')
     let stderr = '', done = false
     proc.stderr.on('data', (chunk) => { stderr += chunk })
     const act = (device, action, args) => {
