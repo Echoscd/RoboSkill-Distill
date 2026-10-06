@@ -4,17 +4,16 @@ description: >-
   A successful control call does not guarantee the intended physical outcome.
   Close the gap between commanded and measured results by observing feedback
   and repeating or adjusting control until a stopping condition or round limit,
-  using world-time waits. For joint arrival, use servo as control and settled as
-  until; for repeated policy inference, use run_policy with fresh observations.
+  using world-time waits. Joint arrival can use servo as control and settled as
+  until; repeated policy inference can use run_policy with fresh observations.
   Optional perceive, process, control and until stages accept tools or inline
-  Python; omitted or null stages return an empty object. Stops owned motion on
-  misses and exit.
+  Python; omitted or null stages return an empty object. 
 parameters:
   type: object
   additionalProperties: false
   properties:
     world: {type: string, description: World clock device.}
-    wait_s: {type: number, exclusiveMinimum: 0, description: 'Observation/replanning interval in world seconds after each control call. The next call may replace a pending trajectory before it completes.'}
+    wait_s: {type: number, exclusiveMinimum: 0, description: 'Observation/replanning interval in world seconds after each control call. The next call may replace a pending trajectory before it completes. Select this wisely; short interval can repeatedly restart acceleration and stall progress; long interval can cause delayed response to environment changes.'}
     stop_after_control: {type: boolean, default: false, description: Stop owned motion after each wait.}
     perceive:
       default: null
