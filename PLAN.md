@@ -1,5 +1,15 @@
 # Current work
 
+## Version 0.10.3
+
+- [x] Validate all 13 RoboEnv catalogs (89 profiles), exported drivers and blocking servo against current Kinex.
+- [x] Bump VERSION and synchronize all package versions and internal dependency pins.
+- [x] Pass the full integration check (307 tests) and validate the v0.10.3 tag against VERSION.
+
+The compatibility audit exercises schema/action contracts, driver transport,
+IK seeds and the stepped world clock. Duration waiting does not imply measured
+arrival; native application may finish on the following simulator tick.
+
 ## Servo and nearby IK stacked on PR #18
 
 - [x] Review and adapt local changes onto the updated hardware-onboarding branch.
