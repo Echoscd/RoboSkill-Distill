@@ -54,18 +54,6 @@ test('checks identify missing pins and stale lock entries even when manifest ver
   await checkVersion(directory)
 })
 
-test('invalid or missing canonical versions cannot partially rewrite metadata', async t => {
-  const directory = await fixture(t)
-  for (const value of ['', 'v0.10.0', '0.10', '01.10.0', '0.10.0-rc.1', '0.10.0\n0.11.0']) {
-    await writeFile(path.join(directory, 'VERSION'), value)
-    const before = await contents(directory)
-    await assert.rejects(syncVersion(directory), /MAJOR.MINOR.PATCH/)
-    assert.deepEqual(await contents(directory), before)
-  }
-  await rm(path.join(directory, 'VERSION'))
-  await assert.rejects(checkVersion(directory), { code: 'ENOENT' })
-})
-
 test('release check enforces the canonical tag and reads no caller working-directory files', async t => {
   const directory = await fixture(t)
   const version = (await readFile(path.join(directory, 'VERSION'), 'utf8')).trim()

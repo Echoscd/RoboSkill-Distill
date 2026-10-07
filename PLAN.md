@@ -1,5 +1,14 @@
 # Current work
 
+## Version 0.10.1
+
+- [x] Bump VERSION and synchronize all package versions, internal pins and lockfile.
+- [x] Validate version consistency, release tag matching and version regression tests.
+- [x] Remove the invalid-version test containing 0.10.0 fixtures as requested.
+
+Validation: Node 22.19 version and release checks passed; all three remaining version tests
+and diff checks passed.
+
 ## Velocity usage clarification
 
 - [x] Explain automatic velocity expiry, retained posture and when an explicit stop is useful.
