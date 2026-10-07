@@ -7,7 +7,7 @@ from kinex import args, device, finish, profile
 from kinex.control import read
 from kinex.frames import pose as frame_pose
 from kinex.geometry import compose_rt, pose_to_rt, xyzq_to_rt
-from kinex.joint_control import project_seed
+from kinex.joint_control import home_start_tolerance, project_seed
 from kinex.motion import flat, joint_target, pose as unit_pose, vector
 from kinex.trajectory import trajectory
 
@@ -65,13 +65,14 @@ def control(a):
     joints = prof["resolved_model"]["joints"]
     state = read(name)
     check_limits = prof["intrinsics"]["control"].get("limit_handling") != "native"
-    start = joint_target(state["positions"], joints, check_limits=check_limits)
+    start = joint_target(state["positions"], joints, check_limits=False)
     goal = joint_target(goal_joints(a, name, prof, start), joints, check_limits=check_limits)
     if "max_joint_delta" in a:
         check_travel(joints, start, goal, a["max_joint_delta"])
     plan = trajectory(joints, start, goal, 0.01,
                       a.get("speedFraction", 1.0), a.get("max_velocity"), a.get("max_acceleration"),
-                      check_limits=check_limits)
+                      check_limits=check_limits,
+                      start_tolerance=home_start_tolerance(prof, joints, goal))
     outcome = device(name, "write", actions=plan.actions, duration_s=plan.duration_s)["data"]
     return {"device": name, "execution_id": outcome["execution_id"], "joints": goal,
             "duration_s": plan.duration_s, "actions_submitted": len(plan.actions)}

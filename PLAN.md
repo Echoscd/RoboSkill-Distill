@@ -1,5 +1,17 @@
 # Current work
 
+## PR #18 merge preparation
+
+- [x] Merge main, retaining v0.10.2 fixes and resolving dependency conflicts.
+- [x] Restore plain home maps and use a fixed 1° inward home-recovery margin.
+- [x] Complete the legged_base rename across profiles, runtime and guides.
+- [x] Pass full checks before publishing the updated PR head.
+
+Validation: Node 22.19 `npm run check` passed all 298 tests, build/typecheck,
+PTY and packed-consumer/release checks. Home recovery and legged-base discovery
+passed; compaction assertions now match the reduced contributed context.
+No physical robot or live provider calls were made.
+
 ## Version 0.10.2
 
 - [x] Bump VERSION for world-wait recovery and IK continuity improvements.
@@ -42,6 +54,183 @@ Validation: Node 22.19 full check passed all 270 tests, including the new timeou
 regressions, packed consumers and PTY integration. RoboEnv's existing CPU clock
 and motion suites passed all 39 tests. Diff checks passed; no native GPU replay
 was run and no RoboEnv sources changed.
+
+## Smaller injected context
+
+- [x] Remove core.devices, core.readiness and setup.plan from contributed model context.
+- [x] Update registration guidance and existing context assertions.
+
+Validation: workspace build/typecheck and the focused setup composition test passed.
+Existing session history retains previously injected sections.
+
+## Custom device guide authoring
+
+- [x] Allow custom per-device DEVICE.md authoring only for legged_base in setup, runtime guidance and documentation.
+- [x] Reject per-device guides outside the legged_base allowlist before injecting runtime context.
+- [x] Cover rejected types, allowed guides, shared fallback, edits and recovery after removal.
+
+Validation: core build/typecheck, both focused guide tests and scoped diff checks
+passed. The device-management suite passed 10 of 11 tests; guide discovery fails
+in the earlier partial rename; the PR preparation completes the schema and template rename.
+
+## RGBD setup guidance
+
+- [x] Remove shared setup repetition and consolidate capture/recording instructions.
+- [x] Preserve calibration contracts, metadata and Use guidance; omit derived FOV from the starter profile.
+
+Validation: guide references, Markdown fences and scoped diff checks passed;
+FOV defaults in the schema and has no built-in downstream task consumers.
+Use text is unchanged. Documentation-only change.
+
+## Velocity setup guidance
+
+- [x] Keep SDK conversion, actual observations and stop-scope rules in setup-device.
+- [x] Document velocity profile fields, buffered hooks, halt-on-expiry and focused checks.
+- [x] Clarify required command channels, posture defaults and feedback absence in Use.
+
+Validation: Kinex parsers preserve metadata and the unchanged starter YAML;
+profile validation, guide separation and relative-link checks passed. Local
+validators cover documented commands/feedback, missing posture, unsupported or
+missing axes, invalid durations, dynamic frames and stop scope. Diff checks
+passed; no hardware or model calls were made.
+Cross-checked all four RoboEnv base profiles: locomotion combines velocity and
+posture, while drive is velocity-only. The guide's Go2-shaped moving and stationary
+commands both pass Kinex validation under the same locomotion mode.
+
+## Setup-device skill simplification
+
+- [x] Shorten setup-device to guide selection, provisioning, driver obligations and focused verification.
+- [x] Remove migration history, protocol internals and duplicated type guidance; correct buffer replacement wording.
+- [x] Preserve discovery metadata, activation rules, cancellation and resource ownership.
+
+Validation: reduced the skill from 1,305 to 656 words. Kinex frontmatter parsing
+preserves all metadata; referenced helpers and guides exist. Reviewed new-device,
+driver-repair and separate-interpreter workflows against current contracts.
+Documentation diff checks passed; no runtime, hardware or model tests were needed.
+
+Compact revision: 686 → 535 words, with driver obligations grouped by contract.
+Preserved current working edits and metadata; Kinex parser and scoped diff checks
+passed. Generic skill validation rejects the existing Kinex-only `resolves` field.
+Cancellation guidance now distinguishes request-local checks between bounded SDK
+operations from background workers' own stop/cancellation mechanisms; checked
+against the current helper implementation and passed scoped diff checks.
+
+## PR #18 integration on main
+
+- [x] Rebase only the 13 commits after 33d20de; exclude the already-merged old target.
+- [x] Preserve 0.10.1 versions and internal pins while retaining setup's extension dependencies.
+- [x] Retain receipt simplification and robot-context changes; correct contracts and migration guidance.
+- [x] Clarify joint home recovery, position-based settling and the legged instance guide.
+- [x] Complete full integration, version, documentation and diff checks.
+- [x] Verify the rebased range excludes already-merged work and preserves runtime implementation.
+- [x] Retarget PR #18 to main and confirm GitHub reports a conflict-free merge.
+
+Validation: Node 22.19 and Python 3.12 full check passed all 281 tests, including
+PTY interaction and packed consumers, plus build/typecheck and release metadata
+checks. Version and diff checks passed. All 15 checked relative documentation
+links resolve except the pre-existing unavailable sibling plugin README.
+
+## Default web search and BTW
+
+- [x] Bundle the workspace's pi-web-search 1.6.0 and pi-btw 0.7.1 in setup.
+- [x] Export setup-owned package locations for standalone's default extension loader.
+- [x] Load upstream extensions by default while honoring explicit npm package settings.
+- [x] Document search availability and BTW child-session behavior.
+- [x] Validate startup, reload, child sessions and packed standalone installation.
+
+Validation: build/typecheck and all 85 standalone checks passed with Node 22.22.2
+and Python 3.11, including default/explicit extension loading, BTW read-only
+child sessions, PTY interaction and relocated package consumption. Version and
+diff checks passed. No live provider search requests were made.
+
+After moving dependency ownership to setup, build/typecheck and all 13 focused
+extension/package checks passed, including setup-only installation, exported
+plugin locations after relocation, standalone loading and shared credentials.
+
+## Robot context safety fields
+
+- [x] Remove safety limits, keep-out zones and notes from the robot context summary.
+- [x] Remove safety.notes from the workspace manifest schema.
+- [x] Validate the core build, context/manifest smoke checks and diff formatting.
+
+Validation: core build/typecheck and smoke checks passed. With Python 3.11,
+167 core tests passed; two camera tests failed because that interpreter lacks
+NumPy. The default Python 3.8 also fails existing modern-Python code.
+
+## Setup receipt simplification
+
+- [x] Remove unused definition, input, output, evidence and dependency hashes from plan receipts.
+- [x] Read existing receipts without their old hash fields; drop them on the next plan write.
+- [x] Retain calibration attempt/result fingerprint checks and plan fact validation.
+
+Validation: core/setup build and typecheck, all 28 setup tests, and changed-file
+diff checks passed. Tests were rerun outside the sandbox after its Python spawn
+restriction blocked the URDF test.
+
+## Legged transition stop scope
+
+- [x] Clarify that stand/crouch transitions need not be interruptible; align setup and driver guidance.
+
+Validation: changed-file diff checks and scaffold syntax passed; runtime unchanged.
+
+## Unregister unloaded devices
+
+- [x] Make stop cleanup idempotent when the driver is inactive, matching unload.
+- [x] Cover never-loaded drivers and unregister after explicit unload.
+- [x] Preserve lifecycle fences, recording cleanup and real deactivation errors.
+
+Validation: core build/typecheck and all ten device-management tests passed,
+including unloaded persistent/one-shot drivers without an available interpreter.
+The scheduler regression and 19 of 20 focused runtime checks passed with system
+Python. The remaining persistent-driver close check passed when rerun with Python
+3.11 instead of the unsupported system Python 3.8.
+
+## Extension child-session credentials
+
+- [x] Keep credentials in data storage and provide a managed Pi agent-directory auth link.
+- [x] Use the same credential entrypoint and OAuth lock in the host and SDK-default child sessions.
+- [x] Preserve conflicting auth files; cover concurrent startup, empty SDK files and credential updates.
+- [x] Complete final standalone validation and remove the local btw workaround.
+
+Validation: build/typecheck and diff checks passed. The standalone run passed 73
+checks; ten failures (including the package parent result) used unsupported system
+Python 3.8. With Python 3.11, all 24 auth, extension, shutdown, PTY and packed-consumer
+checks passed, including the final auth changes. The installed btw extension is
+restored to its original version. Restart Kinex to establish the managed auth link;
+real provider requests were not used for validation.
+
+## Calibration acceptance guidance
+
+- [x] Align tool guidance and workflow stopping conditions with user-accepted approximate results and accuracy/time budgets.
+- [x] Preserve measured errors, original quality assessments and invalid-result exclusions.
+
+Validation: documentation diff checks passed; no links added or changed.
+
+## Legged base template
+
+- [x] Add an independent legged_base template requiring a custom instance Use guide.
+- [x] Describe minimal SDK states/skills, measured readback and explicit writes.
+- [x] Seed crouched_down and drive; add states/optional skills only for user needs.
+- [x] Declare control.device_modes and use mode consistently for writes and measured feedback.
+- [x] Prefer velocity-compatible motion parameters, feedback names and expiry semantics; adapt SDK details in drivers.
+- [x] Support SDK-defined writes, optional state graphs and observed state feedback.
+- [x] Validate template resolution, profile schema and state-control contracts.
+
+Validation: full workspace build/typecheck, eight device-management tests, three
+legged tests (including the SDK mock scaffold), and frame/readiness/architecture/
+contribution regressions passed. Vendor SDK hooks remain to be implemented during
+device setup; no physical legged was exercised.
+
+## Device-specific context
+
+- [x] Prefer optional per-device DEVICE.md Use sections over type guides.
+- [x] Scope guidance to loaded devices and preserve shared fallback precedence.
+- [x] Cover edits, removal, invalid overrides, nested discovery and inert Python state.
+- [x] Validate core typechecking, device-management tests and diff formatting.
+
+Validation: core build/typecheck and all eight device-management tests passed.
+The full core suite was attempted; Python-dependent checks fail with the local
+Python 3.8 interpreter (unsupported modern typing and executor APIs).
 
 ## Version 0.10.1
 

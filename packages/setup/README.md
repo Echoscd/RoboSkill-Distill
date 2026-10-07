@@ -38,6 +38,14 @@ global and packaged precedence. Setup borrows core's tracked runtime, cancellati
 recording attribution, Python and owned-process lifecycle. Construction and plan
 inspection do not create a workspace or initialize Python.
 
+Setup also bundles `pi-web-search` 1.6.0 and `pi-btw` 0.7.1 as npm dependencies.
+`setupPiExtensions()` from `@kinex/setup/extensions` returns their package names
+and absolute package directories for a Pi host's resource loader. Standalone
+loads these extensions by default; other hosts opt in through this export.
+Importing setup does not activate a Pi session or load these extensions.
+Web search uses the host's model and credentials. BTW creates upstream Pi side
+sessions; those sessions do not inherit Kinex robotics tools or permission hooks.
+
 ## Tools and workflows
 
 | Tool | Responsibility |
@@ -83,9 +91,13 @@ Facts use `{kind:"profile", device?, pointer, value?}` or `{kind:"file", path}`.
 Omit device to read the workspace manifest. JSON pointers select narrow facts;
 value optionally requires exact equality. Null retains its profile meaning; `???`
 and absent fields are unknown. File paths are relative to `.kinex` or absolute.
-Avoid volatile activation/timestamps and live poses as fixed-calibration inputs.
-Record required driver/model files as inputs; URDF requirements also fingerprint
-model bytes. Planning never resolves models or reads hardware.
+Use narrow profile pointers for both inputs and outputs, tracking only facts relevant
+to the node's conclusion. Keep volatile loaded/meta fields and live poses out of
+persistent calibration dependencies and outputs. World motion does not invalidate
+arm-to-base geometry.
+Record required driver/model files as inputs. Plan inspection checks their presence;
+calibration attempts separately fingerprint input contents, including URDF bytes.
+Planning never resolves models or reads hardware.
 
 A task has `objective`, `targets` (node IDs), and optional direct `facts`. Only the
 targets and their transitive prerequisites are required now. Empty targets can
@@ -98,8 +110,14 @@ Save/select/record require the returned revision. Invalid references, cycles,
 participant mismatches and missing producer dependencies are rejected. Outcomes
 are `done`, `partial`, `failed` or `needs-input`; observation also derives `ready`,
 `blocked` and `stale`. Completion requires existing evidence and expected outputs.
-Changed relevant facts/files/evidence or prerequisite completion invalidate affected
-receipts. Malformed deferred procedures are reported without gating unrelated tasks.
+Completed nodes become stale when required facts, outputs, evidence files or completed
+prerequisites are missing, including when an explicit profile value no longer matches.
+Content changes, node-definition edits and re-recorded completed prerequisites alone
+do not invalidate receipts. Reassess their relevance when modifying a completed plan.
+Receipts contain status, note, evidence and time; old hash fields are ignored on read
+and removed on the next plan write. Calibration attempts and solver results retain
+their separate input, definition and prerequisite checks. Malformed deferred
+procedures are reported without gating unrelated tasks.
 
 For example, establish an existing camera connection without calibrating geometry:
 
@@ -132,7 +150,12 @@ attempt. Camera images and solver source files are copied before use. Old sample
 are preserved; record exclusions in a separate solver input with references to them.
 Results separate computation, quality, resolved fields, unresolved facts and
 `proposedChanges`. Failed quality proposes no writes. Warnings require review against
-task accuracy. Record the returned numbered `evidence` path after applying and
+task accuracy. If the user explicitly requests keeping an over-limit result during
+setup, honor that request without refusing or forcing recollection due to the error.
+When requested, apply computed fields from archived solver data with `profile_write`
+even when `proposedChanges` is empty, preserving frame conventions and validation.
+Archive the errors, limits and user decision; retain the original quality assessment
+and do not mark a failed-quality node done. Record the returned numbered `evidence` path after applying and
 verifying accepted changes; later solves do not overwrite that evidence.
 
 `setup.plan` exposes `inspect`, `read`, `save`, `select`, and `record`.

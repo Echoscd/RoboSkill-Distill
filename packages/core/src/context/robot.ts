@@ -24,6 +24,15 @@ function deviceLine(device: Device): string {
     `${device.name} (${device.type}${accessBit(device)})${device.loaded ? "" : " [UNLOADED]"}`,
   ]
   switch (device.type) {
+    case "legged_base": {
+      const { control } = device.intrinsics
+      if (known(control)) {
+        if (control.device_modes) bits.push(`, device states: ${Object.keys(control.device_modes).join(", ")}`)
+        if (Object.keys(control.skills).length) bits.push(`, SDK skills: ${Object.keys(control.skills).join(", ")}`)
+      }
+      bits.push(", profile-defined read/write; prefer shared velocity conventions; unlocalized root")
+      break
+    }
     case "rgb":
     case "rgbd": {
       bits.push(!cameraMissing(device.intrinsics.color) ? ` intrinsics: known (${device.intrinsics.source})` : " intrinsics: ???")
@@ -131,7 +140,7 @@ function mountTreeLines(devices: Device[]): string[] {
     const mount = deviceMount(device)
     if (mount === undefined || !known(mount)) {
       const feedback = devicePoseFeedback(device)
-      if (device.type === "velocity" || (feedback !== undefined && known(feedback) && feedback.pose_frame === null)) continue
+      if (device.type === "velocity" || device.type === "legged_base" || (feedback !== undefined && known(feedback) && feedback.pose_frame === null)) continue
       unplaced.push(device.name)
       continue
     }
@@ -239,17 +248,6 @@ export async function renderRobotSummary(cwd: string, snapshot?: ProfileSnapshot
         `    [UNLOADED] devices are out of service: do not read from or calibrate ${unloaded.map((device) => device.name).join(", ")} — activate them through the device tool (action="load") or /load <device>.`,
       )
   }
-
-  const safety: string[] = []
-  if (known(robot.safety.max_cartesian_velocity)) safety.push(robot.safety.max_cartesian_velocity === null
-    ? "cartesian velocity: no additional cap"
-    : `cartesian velocity <= ${robot.safety.max_cartesian_velocity} m/s`)
-  if (known(robot.safety.max_joint_velocity)) safety.push(robot.safety.max_joint_velocity === null
-    ? "joint velocity: no additional cap"
-    : `joint velocity <= ${robot.safety.max_joint_velocity} rad/s`)
-  for (const zone of robot.safety.keep_out_zones) safety.push(`keep-out [${zone.min.join(",")}] to [${zone.max.join(",")}] m`)
-  if (safety.length > 0) lines.push(`  safety: ${safety.join("; ")}`)
-  if (robot.safety.notes) lines.push(`  safety notes: ${robot.safety.notes}`)
 
   lines.push(...statusLines(plan))
   lines.push("</robot>")

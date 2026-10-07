@@ -1,133 +1,95 @@
 ---
 name: setup-device
 description: Add a device or repair its driver — choose an instance or type guide, provision its runtime, fill a profile and verify the interface.
-resolves: access:velocity,access:joint,access:gripper,access:dexterous_hand,access:suction,access:rgb,access:rgbd,access:imu,access:force_torque,access:model,intrinsics:model,access:detection,intrinsics:detection,access:segmentation,intrinsics:segmentation,access:other
+resolves: access:velocity,access:legged_base,access:joint,access:gripper,access:dexterous_hand,access:suction,access:rgb,access:rgbd,access:imu,access:force_torque,access:model,intrinsics:model,access:detection,intrinsics:detection,access:segmentation,intrinsics:segmentation,access:other
 ---
 
 # Set up a device
 
 ## Select the guide
 
-Use the ordered Device guide roots in the current context (workspace/project,
-global, builtin). For the requested family/name, look for `<root>/<name>/DEVICE.md`
-in every root first. If no instance matches, use
-`<root>/templates/<type>/DEVICE.md` in the first root containing it. Establish
-missing type/name information from existing configuration before asking the user.
-Do not substitute a generic template for an available concrete instance.
+Resolve name/type from configuration and user facts before asking. In context's
+ordered Device guide roots, search all `<root>/<name>/DEVICE.md` paths before
+falling back to the first `<root>/templates/<type>/DEVICE.md`.
+Read Setup and applicable Use sections; start from Setup → Profile YAML or the
+setup script's profile. Follow the type's units, frames, commands and feedback.
 
-Read the selected guide's Setup section and its type's Use section. Both are
-available from the same Device guide roots; packaged type guides contain both.
-Use the starter YAML under Setup → Profile, or the generated profile when the
-instance's setup script supplies one. Do not copy illustrative fragments elsewhere
-in the guide. Template driver.py is executable scaffolding. Concrete instances
-may also supply setup.sh and runtime support modules.
+## Provision and register
 
-## Prepare and register
+Copy the driver scaffold and support files into the resolved workspace's
+`devices/<name>/`, independent of packaged template paths. Complete its SDK hooks;
+read connection, model and calibration settings from sibling `profile.yaml`.
+Shared vendor clients may use workspace `lib/`.
 
-1. Inspect existing configuration/SDKs and use the user's supplied facts and
-   authorization. Ask only for missing facts. Keep source provenance; unknowns
-   remain ??? and calibration work is queued through profile_write kind=needed.
-2. Prepare the device directory under the workspace's devices/<name>/; keep device
-   sources, caches, artifacts and outputs there. Use the shared Kinex core Python
-   by default and record SDK dependencies with `uv add --project <python.project> PACKAGE`,
-   using the project path from current context. Use a separate
-   environment and an explicit interpreter only when required by a vendor/model
-   stack or supplied by the user. Include imports used by helpers (for example
-   PyYAML, numpy, Pillow). Store credentials in environment variables.
-3. Copy driver.py and every runtime support module into the device directory, then
-   complete its SDK hooks. Never retain imports, symlinks or access.driver entries
-   pointing into packaged templates; keep the provisioned driver self-contained
-   apart from core Python helpers and its declared dependencies. Connection, model, calibration and
-   command settings come from the actual sibling profile.yaml. The harness puts
-   its kinex Python helpers and workspace lib/ on PYTHONPATH. Direct test
-   invocations need those paths explicitly. Shared vendor clients belong in lib/.
-4. Write the starter profile plus known instance facts through profile_write. Set
-   all implemented driver actions; omit interpreter for Kinex core Python, or set
-   an absolute path for a separate environment. Keep loaded:false
-   for new devices. Repairing an existing driver preserves its profile and
-   activation state; persistent drivers need /reload or device unload followed by load to pick up edits.
-5. Validate schema, imports and driver syntax without starting the device. Use
-   mock SDK tests for conversions, invalid-command rejection and lifecycle.
-   The readiness section in current context reports connection completeness and declared actions. Clear a resolved access request explicitly with needs_calibration:null.
-   Registration ends unloaded. When activation is part of the authorized task,
-   use the device tool action=load (device_act permission); /load is also available.
-   Probe readiness with device status or /ping. Real reads/inference and motion
-   tests follow activation and the user's authorized task.
+Use context's core Python; record dependencies with
+`uv add --project <python.project> PACKAGE`. If the vendor or user requires another
+environment, set `access.driver.interpreter` to its absolute interpreter path;
+otherwise omit it. Keep credentials in environment variables. For direct checks,
+set command-local `PYTHONPATH` to context's core helper and workspace library paths.
 
-## Shared driver protocol
+Use `profile_write`: declare implemented actions, preserve facts/provenance, leave
+unknowns as `???`, and mark missing calibration `kind=needed`. Clear resolved
+requests with `needs_calibration:null` in the relevant section. New devices stay
+unloaded; edits preserve activation intent.
 
-Drivers are persistent by default (`access.driver.persistent: true`). The harness
-runs `<interpreter> driver.py --serve` in the device directory: one JSON line
-{id,action,args} per request, one flushed response {id,ok:true,...payload} or
-{id,ok:false,error:"..."}. Echo the string id; replies may finish out of order. Use kinex.driver_protocol.run for the message loop,
-stdout isolation and idempotent cleanup on EOF/SIGTERM. Load acquires connections,
-starts owned services and waits for readiness. Load is idempotent: reuse healthy resources, and restore an owned
-service that has stopped. Keep resources in the persistent driver. A failed
-load must undo partial acquisition; use local try/finally or ExitStack in the SDK
-hook. Reads, writes and inference do not restart a failed persistent service;
-explicitly load it again. Status only observes and must never initialize it.
-SDK diagnostics go to stderr; imports must also keep stdout clean. Preserve
-large outputs according to the type contract; expose a primary file path as
-`file`. The harness returns other payload fields as data.
-Set timeout_s for the longest operation.
+Custom `devices/<name>/DEVICE.md` files are allowed only for type `legged_base`.
+For that type, write a concise `## Use` as required by its guide: it replaces the
+type's Use section, so include the applicable operating contract and verified
+examples. Keep provisioning in Setup. For every other type, do not create or
+customize a per-device `DEVICE.md`; use the shared type guide and keep instance
+parameters in `profile.yaml` and SDK adaptation in the driver.
 
-Observation and computation actions run concurrently with writes. Writes are ordered per
-logical device; independent devices may write together. Capture start/stop uses a
-separate ordered queue. Load/unload fence active users before replacing resources.
-SDK hooks must protect short native operations and connection bookkeeping, never
-hold a lock needed by reads or halt throughout a motion wait. Check
-`kinex.driver_protocol.check_cancelled()` between native operations in write hooks.
-Stop cancels active and queued writes before invoking halt; new writes wait for
-stop completion. The runner also accepts the internal `{id,interrupt:true}` control
-frame to cancel hooks when a different driver's stop affects this device.
-Existing hand-written persistent loops must migrate to correlated replies; untagged
-responses fail with a migration error.
+## Driver contract
 
-Only use explicit persistent:false for adapters that require a fresh process
-per call. These receive one `{action,args}` JSON line on stdin and
-return one response object; they cannot retain a connection or recording
-between calls or own a long-lived service. Close temporary clients at process
-exit without cancelling accepted asynchronous commands; explicit unload performs
-the declared stop. Persistent driver edits take effect after /reload.
+Reuse core helpers. Default to persistent drivers with `kinex.driver_protocol.run`
+for correlated JSONL, concurrency and exit cleanup. Keep SDK diagnostics off stdout,
+including imports; set `timeout_s` for the longest operation.
 
-Implement read/load/unload/status and the type's declared operations.
-Read/status report actual state; acquisition timestamps identify samples, not
-polling. Drivers adapt native units/axes and transport; shared helpers implement
-common validation/conversion. Follow the type guide for where corrections are
-applied. Actuated writes validate before effects, require positive duration_s
-and replace goals without restarting identical targets.
-Submit the validated buffer and return execution_id and
-measured state immediately. Consume references at the fixed device cadence;
-submission does not promise arrival. Explicit stop clears the affected buffers.
-Read/load must not initiate motion or silently clear faults; unload releases
-resources and safely stops active actuation. Attempt recorder shutdown, halt,
-disconnect and owned-service cleanup even if an earlier stage fails; use
-kinex.driver_protocol.release for independent stages. Retain cleanup handles
-and required configuration so unload does not depend on rereading profile.yaml.
-Cleanup is idempotent and never opens a connection on an inactive persistent driver.
-Report actual stop scope and cleanup errors.
+Implement `load`, `unload`, `status` and type operations:
 
-Keep driver-owned child services in its process group (no detached daemon or
-start_new_session); retain their handles and stop/wait for them on unload. The
-harness allows five seconds for EOF cleanup, then terminates the owned group.
-A remote/shared service is borrowed: close the client, never stop the shared
-server. Starting a service must not initiate motion, home actuators or clear faults.
+- **Lifecycle:** load acquires resources, reuses healthy connections, waits for
+  readiness and rolls back failed startup. Status only observes; ordinary calls
+  never restart failed services.
+- **Feedback:** adapt SDK units/axes/frames; return actual observations and the
+  type's absence values, never invented or echoed commands. Preserve acquisition
+  timestamps, including cached readings.
+- **Writes:** validate before effects; replace pending references and return
+  `{execution_id, state}` immediately with measured state, not claimed arrival.
+  Follow the type's duration, expiry and stop rules.
+- **Concurrency:** keep reads/stop responsive with short SDK locks; never hold
+  their locks across motion waits. In long-running request handlers, call
+  `kinex.driver_protocol.check_cancelled()` between bounded SDK operations.
+  Background workers need their own stop/cancellation mechanism.
+- **Cleanup:** declare all affected devices in stop scopes. Unload stops within
+  scope and releases resources. Use `kinex.driver_protocol.release` for independent
+  cleanup stages even after failures; retain handles, report errors and make retries harmless without
+  opening connections. Keep owned services in the driver's process group and
+  stop/wait for them; close borrowed clients without terminating shared services.
 
-Every type supports load/unload/status. Ping never spawns a process. The agent
-can load/unload through the device tool with device_act permission; Python tools
-cannot change lifecycle. Verify repeated load/unload, failed startup, cleanup
-failures and process exit with fake SDKs before testing hardware.
+Use `persistent:false` only when each call needs a fresh process: retain no
+connections, recordings or owned services between calls. Release temporary clients
+without cancelling accepted asynchronous commands; explicit unload performs stop.
 
-Declare local frames in `intrinsics.frames` as `{parent_frame, translation_m,
-rotation_xyzw}`. Null parent means the device base; null transform components
-mean unknown. Joint `kinematics.frame` and hand geometry declare computed frames;
-do not repeat them in `intrinsics.frames`. Parents may name computed frames and
-cannot form cycles. Follow the type
-guide for fixed transforms, computed poses and supported live feedback. Use
-`device:frame` references and `extrinsics.mount` for placement in a parent device's frame. Frames have no
-separate device directory or driver.
+Prioritize using official vendor SDKs such as pyrealsense2 for RealSense cameras and i2rt python API for i2rt yam manipulators.
+Search for official documentations of the SDKs and follow recommanded usage.
+Do not reimplement functionalities provided in the SDKs.
+Do not assume user is faimiliar with the SDKs.
 
-A reusable instance can be saved under a content root's device/<name>/ with
-DEVICE.md (Setup/Profile) and its driver. Core type guides contain Setup/Profile and Use together. Workspace/global
-type overrides follow the same format; keep setup material out of Use, which is injected into
-normal task context for loaded devices.
+## Setup process
+
+Supervised movement of the devices is encouraged for to enable faster setup.
+Any movable device (bases, joints) needs response time, avoid using very small speed commands in the setup.
+Test and record response behavior under `control.modes.<mode>.response`.
+**Do not enforce any additional safety constraints** other than the declared fields in the
+device profile through the whole process, inlcuding check scripts, drivers, etc.
+Allow human to override any existing safety check.
+
+## Verify
+
+Check schema, imports and syntax without starting hardware. Use focused mocks for
+changed conversions, input rejection and lifecycle failures as relevant.
+
+Activate only when authorized, through device load/unload actions or `/load`;
+Python tools cannot change lifecycle. Check readiness with status or `/ping`, then
+perform task-required reads, inference or motion checks. After code or cached
+configuration changes, reload persistent drivers with `/reload <name>` or unload/load.

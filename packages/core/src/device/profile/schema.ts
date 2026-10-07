@@ -8,6 +8,7 @@ import { ForceTorqueConnection, forceTorqueShape } from "./force-torque.ts"
 import { worldShape, type WorkspaceBounds } from "./world.ts"
 export { WorkspaceBounds, Surface } from "./world.ts"
 import { VelocityControl, VelocityFeedback, VelocityStop } from "./velocity.ts"
+import { LeggedControl, LeggedStop } from "./legged.ts"
 import { gripperShape, suctionShape } from "./gripper.ts"
 import { jointShape, refineJoint, jointModel } from "./joint.ts"
 import { HandGeometry, refineHand } from "./hand.ts"
@@ -26,6 +27,7 @@ const Aabb = z.object({
 })
 
 export const DeviceType = z.enum([
+  "legged_base",
   "velocity",
   "dexterous_hand",
   "suction",
@@ -111,6 +113,10 @@ const velocityState = {
   method: z.enum(["unknown", "factory", "introspection", "manual", "survey"]).default("unknown"),
 }
 const VelocityIntrinsics = z.strictObject({ ...velocityState, ...localFrames, control: may(VelocityControl).default(MISSING), feedback: may(VelocityFeedback).default(MISSING), stop: may(VelocityStop).default(MISSING) }).prefault({})
+const LeggedIntrinsics = z.strictObject({
+  ...velocityState, ...localFrames,
+  control: may(LeggedControl).default(MISSING), stop: may(LeggedStop).default(MISSING),
+}).prefault({})
 const VelocityAccess = z.strictObject({
   ...velocityState, connection: may(ControlConnection).default(MISSING),
   driver: driverWith(actuatedActions),
@@ -182,6 +188,12 @@ const deviceBase = {
 }
 
 export const Device = z.discriminatedUnion("type", [
+  z.strictObject({ ...deviceBase, type: z.literal("legged_base"),
+    access: AccessSection.optional(), intrinsics: LeggedIntrinsics,
+  }).superRefine((device, ctx) => {
+    for (const key of ["mount", "pose_frame"] as const)
+      if (device.extrinsics[key] !== undefined) ctx.addIssue({ code: "custom", path: ["extrinsics", key], message: "legged bases are unlocalized roots; use explicit frame estimates" })
+  }),
   z.strictObject({ ...deviceBase, type: z.literal("velocity"),
     access: VelocityAccess.optional(), intrinsics: VelocityIntrinsics,
   }).superRefine((device, ctx) => {
@@ -294,7 +306,6 @@ export const RobotManifest = z.strictObject({
       max_cartesian_velocity: may(z.number().nullable()).default(MISSING).describe("m/s; null = no additional cap; ??? = unspecified"),
       max_joint_velocity: may(z.number().nullable()).default(MISSING).describe("rad/s; null = no additional cap; ??? = unspecified"),
       keep_out_zones: z.array(Aabb).default([]),
-      notes: z.string().optional(),
     })
     .prefault({}),
   meta: z.object({
@@ -337,7 +348,7 @@ export function matchesDeviceType(actual: DeviceType, required: DeviceType): boo
 
 // Control contracts determine actuation.
 export function isActuated(device: Device): boolean {
-  return ["joint", "velocity", "gripper", "dexterous_hand", "suction"].includes(device.type)
+  return ["joint", "velocity", "legged_base", "gripper", "dexterous_hand", "suction"].includes(device.type)
 }
 export function isVelocity(device: Device): device is Extract<Device, { type: "velocity" }> { return device.type === "velocity" }
 export function isJoint(device: Device): device is Extract<Device, { type: "joint" | "dexterous_hand" }> { return device.type === "joint" || device.type === "dexterous_hand" }
@@ -382,7 +393,7 @@ export function deviceHome(device: Device): number[] | undefined {
 
 // Measured roots declare an external pose reference.
 export function devicePoseFeedback(device: Device) {
-  if (device.type === "velocity") return undefined
+  if (device.type === "velocity" || device.type === "legged_base") return undefined
   if (device.extrinsics?.pose_frame !== undefined) return { pose_frame: device.extrinsics.pose_frame }
   return undefined
 }

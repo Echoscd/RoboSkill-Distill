@@ -24,6 +24,7 @@ kinematics, perception, control, recording and lazy Python preparation. Setup bo
 the runtime through tracked operations/tool execution; the runtime owns cancellation,
 recording attribution and disposal. Unregister lives in core and holds its device
 transition fence through deactivation and deletion.
+Unregister also removes unloaded devices without starting their drivers.
 
 ## Core contracts
 
@@ -39,7 +40,8 @@ transition fence through deactivation and deletion.
   dispatch preflights commands once before admission and observes traffic; drivers
   validate again at the device boundary. A per-device scheduler replaces prior motion.
   Reads run alongside writes; independent devices write concurrently. Stop
-  interrupts affected commands and clears their queued writes. Lifecycle
+  interrupts affected driver calls and clears their queued writes; physical
+  interruption follows the device's declared operation-specific stop scope. Lifecycle
   transitions fence resource users before releasing connections.
   Persistent drivers use JSONL; one-shot drivers read one `{action,args}` stdin
   line and release temporary clients. Core
@@ -48,6 +50,10 @@ transition fence through deactivation and deletion.
   readiness; ordinary calls never restart failed services. Stop bypasses approval.
   Unload attempts capture shutdown, stop and resource release; borrowed services
   are not terminated. Joint goals are absolute vectors in model order, in radians/metres.
+  Home is a plain joint-name-to-position map. Joint devices returning to declared
+  home may use a fixed 1° revolute recovery margin: the out-of-limit prefix moves
+  inward and the final target stays within limits. Measured starts are not clamped;
+  prismatic limits remain strict. The margin is not configurable in profiles.
   All actuator writes submit a validated buffer with `duration_s` and return
   immediately with `execution_id` and measured `state`.
   Gripper and suction actions are flat numeric sequences; joint and dexterous-hand
@@ -117,6 +123,9 @@ transition fence through deactivation and deletion.
   translation and rotation fields. `???` is unresolved; `null` follows field semantics.
   Calibration writes are validated; plan inspection is read-only. Setup owns a persisted,
   agent-authored DAG with task-selected prerequisites and evidence-backed outcomes.
+  Completed plan nodes check fact availability, explicit values and completed
+  prerequisites, without comparing receipt hashes after content or definition edits.
+  Calibration attempts and solver results retain their own fingerprint checks.
   Calibration settling requires fresh declared velocity feedback (including hands);
   it never advances simulator time. A settle timeout after a read saves that sample
   as `settled:false`; FK and archival retain caller cancellation independently of
@@ -167,6 +176,23 @@ transition fence through deactivation and deletion.
   composed calls retain permissions and recording attribution. Skills supply
   procedures. Shared device context and setup guidance cover cross-type contracts;
   each device guide owns its Setup details and a concise, model-visible Use section.
+  Agent authoring of custom `devices/<name>/DEVICE.md` is allowed only for type
+  `legged_base`; other types use shared guides, profile parameters and driver SDK
+  adaptation. Runtime context rejects custom per-device guides for types outside
+  this allowlist. Allowed guides take precedence over shared type guides with
+  normal content precedence. Guidance
+  is scoped to its devices and refreshed in dynamic context; Setup stays excluded.
+  `legged_base` prefers shared velocity parameters and semantics for equivalent
+  motion and readback, with driver-side SDK adaptation. Custom instance guide
+  authoring is reserved for `legged_base`. Its control declares a write argument schema,
+  a minimal skill catalog and optional `device_modes` graph. The driver
+  validates live prerequisites, submits SDK operations without waiting for physical
+  completion, and owns cancellation/replacement. `mode` is the single
+  state/mode selector for writes and measured readback. Motion uses named-axis velocity,
+  optional posture and duration_s with velocity expiry to zero. State changes and
+  optional skills extend that interface without artificial motion fields.
+  Legged stand/crouch transitions need not support reliable interruption;
+  document their stop limits rather than disabling them for that reason.
   Detection/segmentation feed perception; depth localization respects
   masks and reports camera-relative measurements. `servo` accepts joint and
   dexterous-hand devices. Joint targets need no geometry; pose targets require
@@ -216,6 +242,10 @@ transition fence through deactivation and deletion.
   using strictly advancing device timestamps as fresh evidence and an optional
   world-time timeout. Changing targets resets stability but retains the timeout;
   predicate state retains `sample_timestamp` separately from world time.
+  When joint velocity feedback is unavailable, `settled` estimates velocity from
+  up to three fresh position samples using device time and continuous-joint wrapping.
+  Three samples are required for completion; calibration sampling still requires
+  declared measured velocity feedback.
   `device` and `devices` share execution; batches
   authorize before dispatch, preserve result order and report per-entry failures.
   Public failure `code` and `details` survive direct tools, batches and Python
@@ -253,7 +283,11 @@ transition fence through deactivation and deletion.
 
 ## Host contracts
 
-Trusted commands and model calls stay separate. Hosts own approval UI, session
+Trusted commands and model calls stay separate. Standalone credentials remain
+in Kinex data storage. A managed agent-directory auth link
+gives the host and SDK-default extension child sessions the same credential and
+lock path, including OAuth refreshes. Conflicting auth entries are never overwritten.
+Hosts own approval UI, session
 identity and cancellation. Standalone retains devices across same-workspace
 sessions while ending outgoing recordings; workspace replacement/quit disposes them.
 Robotics-containing batches execute in order. Denial/cancellation stops subsequent
@@ -261,6 +295,15 @@ scoped calls without rolling back completed work. Tools/skills refresh within ta
 Stable instructions accompany a dynamic context snapshot restored after compaction.
 Images enter history as bytes. Native host contracts belong to the separate plugin
 project; core remains host-independent.
+Robot context omits workspace safety limits and keep-out zones. Those fields remain
+in the manifest; `safety.notes` is no longer part of its schema.
+
+Setup bundles pinned upstream `pi-web-search` and `pi-btw` packages and exposes
+their locations through `@kinex/setup/extensions`. Standalone loads them through
+Pi's resource loader. Explicit npm package settings take precedence at
+startup. Core remains independent of these extensions; BTW child sessions use
+upstream coding tools and shared credentials, without Kinex's robotics runtime
+or permission hooks.
 
 ## Delivery
 

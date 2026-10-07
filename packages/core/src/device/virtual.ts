@@ -129,6 +129,8 @@ export function mockAct(
   action: string,
   args: Record<string, unknown>,
 ): DeviceReading {
+  if (device.type === "legged_base" && ["read", "write"].includes(action))
+    throw new NamedError("DeviceActionError", "legged SDK behavior requires a driver; the stationary mock does not simulate it")
   const state = mockState(workspace, device)
   if (action === "stop") {
     state.pending = undefined

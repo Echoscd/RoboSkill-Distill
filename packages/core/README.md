@@ -96,6 +96,26 @@ Actuator writes submit validated buffers with `duration_s` and return immediatel
 with `{execution_id, state}`. State is measured at submission, not completion.
 Devices consume them at their fixed cadence. Position devices retain the last
 reference; velocity devices expire to zero velocity while retaining posture.
+`legged_base` uses `mode` as its single state/mode selector, with shared
+motion parameters: named-axis `velocity`,
+optional `posture`, and `duration_s` with velocity expiry to zero. Drivers adapt
+these to the SDK. `intrinsics.control.write`
+declares its write argument schema, `control.skills` describes the minimal exposed
+SDK skills, and optional `control.device_modes` maps writable states to
+`{description, transitions}`. State-only writes and discrete skills need no
+artificial motion fields; additional parameters extend the shared conventions.
+The same `mode` field selects transitions and motion. For example, motion can use
+`{mode: "drive", velocity: {vx: 0.05, vy: 0, wz: 0}, duration_s: 0.5}`
+when those axes are supported and the measured state permits driving.
+Drivers validate live state prerequisites and submit SDK operations, returning
+`{execution_id, state}` with observed `timestamp`, `faults`, and `mode`
+when a state machine is declared. Unknown state is null; transient/fault states
+may be observed without being writable. Normal actuation permissions, stop,
+cancellation and ownership still apply. Custom per-device `DEVICE.md` files are
+allowed only for type `legged_base`; provision that type's guide with supported
+Kinex read/write examples and SDK mappings using the legged template. Do not
+create or customize per-device guides for other types.
+
 `world.read` returns `time_s`; `world.wait(duration_s)` waits on the driver's clock.
 Reads may also include `budget: {used_s, max_s}`: episode time consumed and
 allowed, in seconds. `used_s` is finite and nonnegative; `max_s` is finite and

@@ -69,7 +69,7 @@ environments run without syncing. The ordinary shell environment stays unchanged
 | `/unload <device|all>` | Stop capture, release the device and its owned resources. |
 | `/reload <device|all>` | Restart device drivers. Bare `/reload` reloads agent resources. |
 | `/ping <device|all>` | Inspect existing services without starting them. |
-| `/stop [device]` | Cancel the current agent response and stop loaded actuators. |
+| `/stop [device]` | Cancel the current agent response and stop loaded actuators within their declared stop scope. |
 | `/unregister <device>` | Confirm, unload, and delete the device's local files. |
 | `/record start arm=10 camera=2` | Start recording with per-device rates. |
 | `/record snap <devices>` | Capture an observation. |
@@ -290,6 +290,7 @@ Kinex uses separate storage from Pi and from legacy Kinex coding sessions:
 | `$KINEX_CONFIG_DIR/agent/settings.json` | Pi-format coding settings. |
 | `$KINEX_CONFIG_DIR/agent/models.json` | Pi-format custom providers and models. |
 | `$KINEX_DATA_DIR/agent/auth.json` | SDK credentials. |
+| `$KINEX_CONFIG_DIR/agent/auth.json` | Managed link to the data-directory credentials, shared with Pi extension child sessions. |
 | `$KINEX_DATA_DIR/agent/sessions/` | SDK JSONL sessions, grouped by workspace. |
 | `.kinex/agent/settings.json` | Project coding settings. |
 | `.kinex/kinex.json` or `kinex.json` | Existing core permissions and recording settings. |
@@ -298,11 +299,18 @@ Kinex uses separate storage from Pi and from legacy Kinex coding sessions:
 The global defaults are `$XDG_CONFIG_HOME/kinex` (`~/.config/kinex`) and
 `$XDG_DATA_HOME/kinex` (`~/.local/share/kinex`). Kinex's launcher sets Pi's documented
 agent-directory override to the Kinex configuration directory. It does not use
-`.pi` settings, extensions, skills, or system prompts. Project `AGENTS.md` and
-`CLAUDE.md` instructions are loaded through the SDK. External Pi packages/resources
-in agent settings are not supported in this first standalone delivery; use Kinex's
-workspace tools and skills. Legacy coding settings, command templates and session
-formats are not migrated.
+`.pi/settings.json`, Pi skills, or Pi system prompts. Project `AGENTS.md` and
+`CLAUDE.md` instructions are loaded through the SDK. Legacy coding settings,
+command templates and session formats are not migrated.
+
+Kinex supports Pi extensions. `@kinex/setup` bundles `pi-web-search` and `pi-btw`,
+which standalone Kinex loads by default.
+
+At startup Kinex creates the credential link above, replacing an empty SDK auth
+file if necessary. Existing nonempty files or links to another destination cause
+a startup error and are left untouched. The host and SDK-default child sessions
+use the configuration-directory entrypoint and its lock for OAuth refreshes.
+Restart Kinex after upgrading; extensions do not need a Kinex-specific auth path.
 
 For a local model, for example, `agent/models.json` can contain:
 
@@ -340,6 +348,23 @@ now named `profile_write`; migrate existing `permission.calib_write` rules to
 `permission.profile_write`. The old name is not an alias. Tool approvals do not provide an OS sandbox.
 
 ## Runtime behavior
+
+Custom per-device operating guides are allowed only for certain types.
+For that type, setup must create `.kinex/devices/<name>/DEVICE.md` beside
+`profile.yaml` with a nonempty `## Use` section. Do not create or customize
+per-device `DEVICE.md` files for other types; use shared type guides, instance
+parameters in `profile.yaml` and SDK adaptation in drivers.
+Runtime context rejects custom per-device guides for types outside this allowlist.
+An allowed guide's Use section replaces the type guide's Use section for that loaded device.
+Devices without the file keep the usual project/global/built-in type-guide
+fallback. Shared fallback text is included once and scoped to its devices.
+Setup sections are excluded; an override must have a nonempty Use section.
+Edits are picked up on the next context refresh.
+
+Robot context no longer includes workspace safety limits or keep-out zones, though
+those structured fields remain in the manifest. `safety.notes` is no longer supported:
+existing notes are ignored when parsing and removed on the next manifest write.
+Move operating guidance that should reach the model into the relevant device's Use section.
 
 - A workspace owns the robotics runtime; a chat session does not own its drivers.
 - New/resumed/forked sessions in the same workspace retain connections, cancel old
