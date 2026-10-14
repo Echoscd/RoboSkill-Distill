@@ -236,3 +236,7 @@ From the repository root run `npm run typecheck`, `npm test`, `npm run test:core
 `npm run test:setup`, then `npm run build` and `npm run pack -- OUTPUT_DIRECTORY`.
 Builds and consumer tests run sequentially. Tests use synthetic evidence and fake
 drivers; physical and live simulator validation are separate. Nothing is published.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).

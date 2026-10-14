@@ -10,6 +10,9 @@
   <a href="https://github.com/stacx-lab/kinex/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/stacx-lab/kinex/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="CI status on main" height="20">
   </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License: Apache 2.0" height="20">
+  </a>
   <a href="#getting-started">
     <img src="https://img.shields.io/badge/Node.js-%E2%89%A5%2022.19-339933?style=flat-square&amp;logo=node.js&amp;logoColor=white" alt="Node.js ≥22.19" height="20">
   </a>
@@ -200,3 +203,10 @@ Kinex builds on [Pi](https://github.com/earendil-works/pi). Its published SDKs
 provide the model integrations, coding tools, agent loop, session management and
 terminal UI. Thanks to the Pi maintainers and community for the foundation and
 plugin ecosystem that make Kinex possible.
+
+## License
+
+Kinex is licensed under the [Apache License, Version 2.0](LICENSE).
+
+Third-party components retain their own licenses. See
+[third-party notices](THIRD_PARTY_NOTICES.txt) for Pi's MIT license and attribution.

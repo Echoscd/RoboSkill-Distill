@@ -1,6 +1,7 @@
 {
   "name": "@kinex/core",
   "version": "1.0.0",
+  "license": "Apache-2.0",
   "description": "Host-independent robotics runtime for coding agents",
   "type": "module",
   "engines": {
@@ -25,7 +26,8 @@
     "assets/**/*.yaml",
     "assets/**/*.json",
     "assets/**/*.txt",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "dependencies": {
     "zod": "^4.4.3",

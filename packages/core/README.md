@@ -555,3 +555,7 @@ Existing velocity profiles must remove `feedback.pose_frame`; drivers must omit
 `pose` from both reads and write-result states.
 Refresh copied RoboEnv profiles and drivers together, restart the simulation service,
 and reload the base after upgrading an existing workspace.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
