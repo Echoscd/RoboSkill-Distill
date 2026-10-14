@@ -36,7 +36,7 @@ metadata and workspace safety configuration.
 | Field | Contract |
 | --- | --- |
 | `name`, `type` | Device identity and the schema governing its interface. |
-| `loaded` | Activation intent, not proof of a ready connection. Registration leaves devices unloaded; profile edits preserve this intent. |
+| `loaded` | Activation intent, not proof of a ready connection. Registration leaves devices unloaded; the model's `profile_write` tool preserves this intent. |
 | `access` | Connection facts and driver configuration: entry, optional interpreter, declared actions, persistence and timeout. |
 | `intrinsics` | Type-specific facts, such as joint models, camera calibration, control limits or inference operations. |
 | `extrinsics` | Physical placement: a fixed mount or a measured pose reference. Omitted for world and model devices. |
@@ -95,13 +95,22 @@ follow the [overview's lifecycle rules](overview.md#runtime-discovery-and-lifecy
 Public `error`, `code` and `details` survive direct, batch and Python calls without
 exposing driver stderr; Python uses `RPCError`, a `RuntimeError` subclass.
 
+Direct tools and Python use `deviceID`, `action` and `args` for device requests.
+Python `device()` returns data fields directly, plus an optional `file`;
+`devices(calls=[...])` returns a `results` array with per-entry `ok`, data or error.
+Batch calls run concurrently under each device's scheduler and retain input
+order; sampling is not simultaneous and effects are not atomic. See the
+[core API](../packages/core/README.md#device-calls-and-control) for signatures.
+
 ### Motion and stop
 
 Dispatch validates before admission and observes traffic. Writes are scheduled per
-device; reads can overlap writes and independent devices write concurrently. Stop
-bypasses approval, interrupts affected calls and clears queued writes within the
-driver's declared operation-specific stop scope. Drivers keep reads and stop
-responsive; uncertain writes are never retried.
+device; reads can overlap writes and independent devices write concurrently.
+New writes supersede older pending commands on the same device. `device_stop`
+and the trusted `/stop` command bypass approval; a direct model `device` call with
+`action: stop` still requests `device_act`. Stop interrupts affected commands and
+rejects queued writes within the driver's declared stop scope. Drivers keep reads
+and stop responsive; uncertain writes are never retried.
 
 Actuator writes submit validated buffers with `duration_s`, returning immediately
 with `execution_id` and measured `state`. Gripper/suction actions are flat numeric
@@ -111,10 +120,23 @@ commands retain the final reference; velocity commands expire to zero velocity
 while retaining posture. Background faults remain visible in reads. Verify arrival
 through fresh feedback.
 
-Ownership outlives submission: cleanup may stop only that invocation's remaining
-motion, never another caller's replacement. Invalid post-submission feedback cancels
-that submission before reporting failure. Failed cleanup reports `stop_failed`
-and blocks further writes until recovery.
+`servo` adds trajectory planning and, by default, waits the planned duration on
+a loaded world clock. This wait does not verify arrival. `block=false` skips it
+and requires no clock. Feedback loops in `exec` choose their own observation
+intervals and stopping conditions; see [Python execution](tools-and-skills.md#python-execution-with-exec).
+
+Ownership outlives submission: cleanup targets references still owned by that
+invocation. Invalid post-submission feedback cancels
+that submission before reporting failure. A failed dispatched stop or a driver
+command reporting `stop_failed` blocks further writes until a successful load.
+
+Python scripts and their composed tools share motion ownership. On controller
+failure, timeout or cancellation, the runner attempts to stop remaining owned
+motion; cleanup failures are logged while the original failure is returned.
+Successful script completion may leave motion running. Use `stop_owned()` to
+request a stop explicitly and receive any cleanup error. Ownership checks preserve
+another invocation's replacement; the driver's declared physical stop scope still
+applies.
 
 ### Observations and capture
 
@@ -127,6 +149,12 @@ arrays; direct agent reads default to base64. Arrays cross JSON as encoded image
 payloads and are decoded by Python; fixed dimensions are validated. Direct agent
 reads attach RGB images in every mode, reusing encoded payloads or reading saved
 files in the same call. Image data is sent as image content, not text.
+
+Python reads retain image data for computation without automatically displaying
+it. To return observations from `exec` or a Python tool, request files and pass
+one path or an ordered list to `finish(result, file=...)`. Include camera identity
+and acquisition timestamps in the result. Multiple captures remain separate
+observations, even when returned together.
 
 Persistent drivers may implement `record_start` and `record_stop` for native
 capture. Otherwise, recording samples through device dispatch. See

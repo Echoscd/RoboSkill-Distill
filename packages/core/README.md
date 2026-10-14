@@ -90,6 +90,8 @@ The existing root APIs remain available without adopting contributions.
 `device` calls one device; `devices` accepts `calls: [{deviceID, action?, args?}]`.
 Batch permissions are checked before dispatch. Calls run concurrently under each
 device's scheduler; results stay in input order and report individual errors.
+The direct `devices` tool sets its top-level error flag only when all calls fail;
+partial failures retain successful image attachments and per-entry errors.
 Direct camera reads default to `output="base64"` and attach RGB images with camera
 identity and timestamp in every mode; no file-opening call is needed. Python
 camera reads default to NumPy arrays. Both accept `output="file"`, `"base64"`, or
@@ -111,8 +113,16 @@ batch = devices(calls=[request])  # {"results": [{deviceID, action, ok, data/fil
 `device(deviceID, action="read", args=None)` accepts positional or keyword arguments.
 `call("device", ...)` and `call("devices", ...)` use the same inputs and results;
 `Device` handles expose `read(args=None)` and `act(action, args=None)`.
-Single failures raise `RPCError`; batches return per-entry errors.
+Single failures raise `RPCError`; batches return per-entry errors. Inspect each
+batch entry: an `ok: false` entry does not itself fail a Python script or trigger
+its controller cleanup.
 `compact` and `verbose` are tool-only presentation options.
+
+When updating older Python scripts, put driver arguments in `args` instead of
+passing them as extra keywords. Read single-call fields directly, without a
+`data` wrapper. Rename batch `commands` to `calls` and entry `device` to
+`deviceID`, then read the returned `results` array. Request `output="file"`
+explicitly when a consumer needs paths instead of camera arrays.
 
 Actuator writes submit validated buffers with `duration_s` and return immediately
 with `{execution_id, state}`. State is measured at submission, not completion.
@@ -226,23 +236,34 @@ Drivers must convert native counts to seconds before reporting a budget. Legacy
   quaternions with norms in `[0.999, 1.001]`, including frame estimates. Values
   outside that range are rejected with the received norm. Persisted profiles
   and velocity readings retain their stricter validation.
+
+### Feedback control with `exec`
+
 Use `exec` for bounded feedback loops and return observations with control results.
-For example, for a revolute arm, pass target `joints` and a positive
-`tolerance_rad` in the exec arguments:
+The `closed_loop` and `settled` built-ins are no longer provided. Replace their
+stage mappings and persistent loop state with Python variables, explicit device
+or tool calls, and task-specific feedback checks.
+For example, for an arm with bounded revolute joints, pass target `joints` and a
+positive `tolerance_rad` in the exec arguments:
 
 ```python
 from kinex import args, call, device, finish, stop_owned
 
 params = args()
 try:
+    initial = device("arm")
+    if initial["faults"]:
+        raise RuntimeError(str(initial["faults"]))
+    previous_stamp = initial["timestamp"]
     motion = call("servo", device="arm", joints=params["joints"])
     # Blocking servo already waited its planned duration. Check fresh feedback.
-    previous_stamp = None
     for _ in range(20):
         feedback = device("arm")
         if feedback["faults"]:
             raise RuntimeError(str(feedback["faults"]))
-        fresh = feedback["timestamp"] != previous_stamp
+        if feedback["timestamp"] < previous_stamp:
+            raise RuntimeError("device clock moved backwards")
+        fresh = feedback["timestamp"] > previous_stamp
         previous_stamp = feedback["timestamp"]
         error = max(abs(q - goal) for q, goal in
                     zip(feedback["positions"], motion["joints"], strict=True))
@@ -257,12 +278,16 @@ finally:
 feedback = device("arm")
 head = device("head_camera", args={"output": "file"})
 wrist = device("wrist_camera", args={"output": "file"})
-finish({"feedback": feedback, "cameras": ["head_camera", "wrist_camera"]},
+finish({"feedback": feedback, "cameras": [
+    {"deviceID": "head_camera", "timestamp": head["timestamp"]},
+    {"deviceID": "wrist_camera", "timestamp": wrist["timestamp"]},
+]},
        file=[head["file"], wrist["file"]])
 ```
 
-Use the workspace's actual camera names, joint units and tolerances. Position
-agreement alone does not establish stability, grasp success or task completion;
+Use the workspace's actual camera names, joint units and tolerances; continuous
+joints need angular error modulo a full turn. Position agreement alone does not
+establish stability, grasp success or task completion;
 check the feedback appropriate to the task. Bound loops, reject faults and missing
 feedback, and stop owned motion when the loop ends. When the next action needs
 visual interpretation, return selected images to the model rather than continuing
@@ -271,16 +296,18 @@ without that decision. Printing camera paths does not attach images.
 Python tools can also use `inline(source, values, kind="perception")` for a lambda
 or source defining `main(**kwargs)`. It returns JSON data and runs in a fresh
 subprocess with the caller's interpreter, directory, deadline and permissions.
-Only controller callers may request `kind="controller"`. Cleanup never stops
-another invocation's replacement motion; uncertain writes are never retried.
+Only controller callers may request `kind="controller"`. Cleanup checks motion
+ownership before stopping; the driver's declared physical stop scope still applies.
+Uncertain writes are never retried.
 Device failures preserve optional `code` and `details` through direct tools,
 batches, nested Python calls and inline stages. Structured tool errors are JSON
 with `error`, `code` and/or `details`; plain errors retain readable text. Python
 raises `kinex.RPCError`, a `RuntimeError` subclass exposing `.code` and `.details`.
 `run_policy` propagates `stop_failed` instead of reporting a normal IK rejection.
-Set servo `block: false` so `wait_s` controls the observation/replanning interval.
-A new control call can replace the remaining references of a full servo plan
-before it completes.
+For replanning during motion, call servo with `block=False` in Python and wait
+explicitly with `device("world", "wait", {"duration_s": interval_s})` between
+observations. A new control call can replace the remaining references of a full
+servo plan before it completes.
 
 Migration: remove `duration_s` from servo arguments; obsolete input is rejected.
 Servo results expose `execution_id` directly and omit `write` and `end_joints`;
@@ -316,8 +343,9 @@ Device writes and `run_policy` retain their existing duration contracts.
   `ready` for background initialization. `devices.dispatch()` is a trusted driver API.
 - `devices.templates()` discovers provisioning instances and type templates.
   `devices.unregister(name, signal?)` holds the device lifecycle fence through
-  capture shutdown, deactivation and deletion, including associated calibration
-  result files. Failed deactivation preserves device files. This trusted method
+  capture shutdown, deactivation and deletion, including legacy calibration
+  files named `*-<device>.json`. Attempt directories and setup plans are retained.
+  Failed deactivation preserves device files. This trusted method
   does not prompt; the `/unregister` command confirms through its host.
 - `profiles.snapshot()/writeManifest()/writeDevice()` and `readiness()` expose
   workspace state. Profile writes validate using the existing schemas.
@@ -376,13 +404,16 @@ other tool traffic retains its tool name.
 `assets/` owns device provisioning bundles (including FastWAM, SAM3 and
 GroundingDINO), template drivers, complete Setup/Profile/Use guides, setup-device,
 operational Python tools and runtime helpers. Assets resolve relative to the
-package. Only each loaded type's Use section enters normal runtime context;
-Setup/Profile is read when needed. Setup ships calibration skills separately.
+package. Only the selected loaded-device guides' Use sections enter normal runtime
+context; Setup/Profile is read when needed. Setup ships calibration skills separately.
 Copy drivers and their runtime support files into device workspaces when provisioning.
 
 Custom Python tools live in `.kinex/tools/<name>/{tool.yaml,tool.py}`, JS/TS tools
 in `.kinex/tools/`, and skills in `.kinex/skills/<name>/SKILL.md` (searched recursively).
-Global configuration uses the same `tools/` and `skills/` subdirectories.
+Global configuration uses the same `tools/` and `skills/` subdirectories. Move
+custom content from old singular `tool/` and `skill/` directories; those are no
+longer custom discovery roots. Packaged `assets/builtin/tool/` and
+`assets/builtin/skill/` paths are unchanged.
 Discovery preserves workspace/project → parent projects → global → built-in
 precedence. `RuntimeOptions.builtinSkillRoots` appends feature-package skill roots
 to the builtin tier; discovery scans local/global roots only once.
@@ -391,7 +422,8 @@ custom tools, reporting conflicts. TypeScript and JavaScript custom tools reload
 Jiti. Tools can retain Zod schemas; Python tools keep raw JSON Schema parameters. Workspaces supply any dependencies imported by custom
 tools. This code is trusted executable workspace content, like standalone Kinex.
 
-Python and uv remain external. Core owns `.kinex/python/{pyproject.toml,uv.lock,.venv}`
+Python and uv remain external. The managed project requires Python >=3.11.
+Core owns `.kinex/python/{pyproject.toml,uv.lock,.venv}`
 per workspace; it never adopts the ordinary Python project. Default drivers/tools,
 URDF inspection and camera encoders use it; explicit interpreters are supported.
 Use `uv add --project <python.project> PACKAGE` for driver dependencies, substituting
@@ -411,7 +443,8 @@ Optional `description` supplies a short lowercase TUI label, such as `inspect ar
 
 ```json
 {
-  "python": "from kinex import devices\nfor result in devices(calls=[{'deviceID': 'arm'}, {'deviceID': 'camera', 'args': {'output': 'file'}}])['results']:\n    print(result)"
+  "description": "inspect arm and camera",
+  "python": "from kinex import device, finish\nstate = device('arm')\nframe = device('camera', args={'output': 'file'})\nfinish({'arm': state, 'camera': 'camera', 'timestamp': frame['timestamp']}, file=frame['file'])"
 }
 ```
 
@@ -426,24 +459,33 @@ directory. For example:
 `args` defaults to `{}` and is available through `kinex.args()`; `argv` defaults to
 `[]` and populates `sys.argv[1:]`. `interpreter` optionally selects a Python
 executable; otherwise execution lazily prepares and reuses Kinex's managed Python.
-`timeout_s` defaults to 120 wall-clock seconds. Each invocation uses a fresh
-process; script stdin receives EOF.
+`timeout_s` defaults to 120 wall-clock seconds. Composed tools also enforce their
+own timeouts within the parent's remaining time. Each invocation uses a fresh
+process; script stdin receives EOF. Owned subprocesses are terminated when the
+invocation ends, including on success.
 
 The result contains `exit_code`, bounded combined stdout/stderr in `output`, and
 `result` (normally `null`). Normal completion and `sys.exit(0)` succeed. Optionally
 use `kinex.finish(value)` for a JSON result, or `kinex.finish(value, file=image_path)`
 to attach an image. Pass `file=[path1, path2]` to attach multiple images in order.
-Failures set the tool's error flag and return `error`, retaining
+When attaching files, `value` must be a JSON object (or omitted); the paths are
+included in its `file` field. Include camera identities and timestamps alongside
+them. Printing paths or returning base64 text does not attach images.
+Execution failures set the tool's error flag and return `error`, retaining
 RPC `code` and `details` when present. `exit_code` is null if Python never started.
 Output truncation is reported explicitly. Raw prints and subprocess output cannot
-be interpreted as runtime messages.
+be interpreted as runtime messages. Invalid arguments use the standard tool
+validation error result; permission denial propagates to the host.
 
 One `python_tool_controller` approval covers script execution and composed runtime
 calls. Scripts can use `device`, `devices`, `call`, `profile`, `robot` and `Device`
 from `kinex`. Composed perception tools retain their restrictions. Python cannot
-load/unload devices or call the recording tool. Failure, timeout and cancellation
-stop motion still owned by the invocation and terminate owned subprocesses;
-successful completion may leave submitted motion running.
+load/unload devices or call the recording tool through its runtime API. Failure,
+timeout and cancellation trigger an attempt to stop motion still owned by the
+invocation and terminate owned subprocesses. Cleanup failures are logged while
+the original failure is returned; successful completion may leave submitted
+motion running. Use `kinex.stop_owned()` to request a stop and receive cleanup
+errors, including in a `finally` block around a control loop.
 
 `call("servo", device="arm", joints=target)` and `call("servo", **params)`
 use keyword arguments, not a positional dictionary. In contrast,
@@ -461,13 +503,15 @@ handles this and the existing persistent protocol. Custom scripts parsing payloa
 from `sys.argv` must migrate to these helpers. Executable paths and `--serve` stay
 in argv; payload size no longer selects a transport.
 
-Internal camera reads default to NumPy arrays. For file-based consumers, perception
-can return `{"image": device("camera", args={"output": "file"})["file"]}`; with an identity
-processing stage, the controller mapping `"inputs": {"/observation/images/0": "/image"}` passes the
-current file path each round. Consumers open the file, and image tools can display
-it to the model. Internal reads do not automatically display images; call the
-camera directly for visual inspection after a tool finishes. Use `output="base64"`
-for encoded PNG/PGM strings without array decoding, or `output="file"` for paths.
+Internal camera reads default to NumPy arrays. For file-based consumers, use
+`frame = device("camera", args={"output": "file"})` and pass `frame["file"]`
+directly in the next tool or model-device call's arguments. Python variables
+carry intermediate observations between computation and control steps.
+Internal reads do not automatically display images; return selected files through
+`finish(result, file=...)` in the same execution or call a camera directly through
+the agent-facing device tools. Use `output="base64"` for encoded PNG/PGM strings
+without array decoding. See [Python scripting](#python-scripting) for result and
+attachment handling.
 
 From the repository root:
 

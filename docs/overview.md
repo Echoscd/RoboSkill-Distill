@@ -24,8 +24,9 @@ Duplicate contribution identifiers are errors.
 Core alone can provision, register, remove and operate devices. Setup borrows its
 runtime through tracked operations and tool execution, sharing cancellation,
 permissions and recording attribution without a separate resource lifecycle.
-Registration leaves devices unloaded. Profile writes cannot change activation
-intent. Core owns readiness facts; setup owns procedures that obtain them.
+Registration leaves devices unloaded. The model's `profile_write` tool preserves
+activation intent; trusted host profile APIs can write it directly. Core owns
+readiness facts; setup owns procedures that obtain them.
 
 ## Runtime, discovery and lifecycle
 
@@ -35,14 +36,25 @@ state belongs to the workspace. Disposal cancels and waits for tracked work,
 finalizes recordings and releases owned processes through the core process helper.
 Borrowed services are never terminated.
 
-`.kinex/workspace.yaml` describes the assembly; `devices/<name>/profile.yaml`
-defines inventory. Discovery precedence is nearest project → ancestors → global →
-packaged assets, with concrete instances before type templates. Read-only discovery
-must not create a nearer workspace or initialize Python.
+The nearest `.kinex/` directory owns the workspace's `workspace.yaml` assembly
+and `devices/<name>/profile.yaml` inventory. Without one, the workspace path is
+`<working-directory>/.kinex`; reads do not create it. Reusable content discovery
+searches nearest project → ancestors → global → packaged assets, with concrete
+device provisioning instances before type templates. Read-only discovery must
+not create a nearer workspace or initialize Python.
 
-Core prepares `.kinex/python` with uv only when its interpreter is missing.
-Concurrent first use waits for preparation to finish. Existing environments run
-without dependency synchronization; repair is explicit. Explicit interpreters own
+Custom tools use `.kinex/tools/`: Python tools occupy
+`<name>/{tool.yaml,tool.py}`, and JS/TS tools live directly in that directory.
+Custom skills use `.kinex/skills/<name>/SKILL.md`, searched recursively. Global
+configuration uses the same plural `tools/` and `skills/` directories. Move custom
+content from the old singular directories to these discovery roots. Packaged
+assets retain their internal `builtin/tool` and `builtin/skill` paths.
+Ordinary scripts passed to `exec` need no discovery entry or manifest.
+
+Core prepares `.kinex/python` with uv when its interpreter is missing, and retries
+incomplete bootstraps remembered by the current process. Concurrent first use
+waits for preparation to finish. Existing environments run without dependency
+synchronization; repair is explicit. Explicit interpreters own
 their dependencies. Ordinary host shells retain their environment.
 
 User commands and permission-checked model tools control lifecycle; Python tools

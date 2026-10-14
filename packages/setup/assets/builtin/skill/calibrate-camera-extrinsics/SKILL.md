@@ -20,8 +20,9 @@ Verify participating devices answer before physical preparation. Move with
 `servo speedFraction <= 0.15`. Servo waits its planned duration by default.
 Set `block=false` for non-blocking motion. Verify measured arrival.
 Record the named attachment frame, without applying TCP offset.
-Use `calib_sample` for robot evidence and camera artifacts; retain both sample IDs
-and timestamps. Sequential captures are not claimed to be synchronized.
+Use `calib_sample` for robot evidence and camera artifacts, passing
+`args: {output: "file"}` for every camera sample. Retain both sample IDs and
+timestamps. Sequential captures are not claimed to be synchronized.
 
 `scripts/detect_board.py` detects ChArUco/checkerboard observations. Archive selected
 pairs as `[{frame_pose:[x,y,z,qx,qy,qz,qw],rvec:[...],tvec:[...]}]` outside the

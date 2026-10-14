@@ -9,16 +9,17 @@ Kinex connects coding agents to physical robots and simulators through three lay
 ![Kinex architecture: the agent loads skills and calls tools or devices directly; tools also operate devices, whose drivers exchange commands and observations with hardware, simulators and services.](../assets/architecture.svg)
 
 The agent loads skills as needed, then calls devices directly through `device` or
-`devices`, or uses tools that combine multiple operations. Both paths return
-results to the agent and preserve the runtime's permission checks. The host owns
-the agent loop, sessions and permission decisions.
+`devices`, uses reusable tools, or combines operations in Python through `exec`.
+These paths return results and selected images to the agent and preserve the
+runtime's permission checks. The host owns the agent loop, sessions and permission
+decisions.
 
 A useful analogy is a coding-agent harness:
 
 | Layer | Coding-agent analogy | Kinex example |
 | --- | --- | --- |
 | Devices | System resources such as disks and GPUs. OS and driver interfaces provide basic operations such as storage reads/writes or GPU computation. | Cameras, actuators and model services expose operations through drivers. |
-| Tools | `bash` executes commands; `grep` searches text. These tools turn resource access into useful operations. | `locate_object_3d` combines camera and model outputs to estimate a position. |
+| Tools | `bash` executes commands; `grep` searches text. These tools turn resource access into useful operations. | `exec` runs Python with device access; `locate_object_3d` combines camera and model outputs to estimate a position. |
 | Skills | A debugging procedure guides the agent to reproduce a failure, inspect code, make a fix and run tests using available tools. | A calibration procedure guides sampling, computation and verification. |
 
 In both cases, resources provide capabilities, tools execute operations, and
@@ -49,21 +50,29 @@ See [device contracts](devices.md) for frames, motion and driver behavior.
 Tools are executable operations with names, descriptions and input schemas. They
 perform computation or sequences of device calls without requiring the agent to
 choose every intermediate step. The `exec` tool runs ordinary Python source or
-script files with runtime access, without requiring a tool manifest. Reusable
-Python tools declare their interface in
-`tool.yaml` and implement it in `tool.py`, with two capability classes:
+script files with runtime access, without requiring a tool manifest. Scripts can
+compose perception and control tools, wait on the world clock, check measured
+feedback in bounded loops, and return structured results with multiple images.
+The agent interprets those observations before choosing the next action.
+
+Reusable Python tools declare their interface in `tool.yaml` and run the manifest's
+entry script (`tool.py` by default), with two capability classes:
 
 - **Perception** tools read and compute. For example, `locate_object_3d` combines
   camera imagery, a detection or segmentation model, and depth to estimate an
   object's position in the camera frame.
 - **Controller** tools can also command devices and run feedback loops. For
-  example, `servo` plans and submits a joint trajectory from measured state;
-  it returns immediately by default, so arrival still requires feedback.
+  example, `servo` plans and submits a joint trajectory from measured state,
+  then waits its planned duration on a loaded world clock by default. Arrival
+  still requires fresh feedback; `block=false` skips the wait.
 
-Python tools preserve permissions, cancellation and motion ownership; neither
-class can load or unload devices. The agent-facing `device` tool and trusted user
-commands provide lifecycle control. Other tools support profile updates and
-calibration. See [agent integration](agent-integration.md) for host responsibilities.
+Python tools and `exec` preserve permissions, cancellation and motion ownership;
+they cannot load or unload devices. Scripts own their stopping conditions and
+must explicitly stop owned motion when successful completion requires it.
+The agent-facing `device` tool and trusted user commands provide lifecycle
+control. Other tools support profile updates and calibration. See
+[tools and skills](tools-and-skills.md) for execution guidance and
+[agent integration](agent-integration.md) for host responsibilities.
 
 ## Skills
 

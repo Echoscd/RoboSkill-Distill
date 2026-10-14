@@ -5,11 +5,19 @@
 Setup owns a persisted, task-scoped DAG; inspection is read-only. Completion checks
 fact availability, explicit values, evidence and completed prerequisites, without
 receipt-hash invalidation on content/definition edits. Calibration attempts and
-solver results retain separate fingerprint checks. Settling requires fresh declared
-velocity feedback and never advances simulation time. A timeout after a read saves
-`settled:false`; FK and archival still honor caller cancellation. RGBD archival
-copies both streams before appending. Profile writes are validated; unrelated
-calibration never gates all operations. See the [setup evidence contracts](../packages/setup/README.md#plan-and-evidence-contracts).
+solver results retain separate fingerprint checks. Calibration samplers' settling
+checks require fresh declared velocity feedback and never advance simulation
+time. A timeout after a read saves `settled:false`; FK and archival still honor
+caller cancellation. Camera sampling must request `args: {output: "file"}` to
+archive image files; RGBD archival copies both streams before appending. Profile
+writes are validated; unrelated calibration never gates all operations. See the
+[setup evidence contracts](../packages/setup/README.md#plan-and-evidence-contracts).
+
+For calibration motion, blocking `servo` already waits its planned duration on a
+loaded world clock. Check fresh measured feedback before sampling; if simulation
+needs more time, advance it explicitly before invoking the sampler. General
+feedback loops use [Python execution with `exec`](tools-and-skills.md#python-execution-with-exec);
+the sampler's own settling and evidence checks remain part of setup.
 
 ## ROS provisioning
 

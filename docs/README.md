@@ -10,7 +10,7 @@ architecture, then read the topics relevant to your change.
 | [Architecture](architecture.md) | Devices, tools and skills, and their connections to agents and environments. |
 | [Project overview](overview.md) | Package ownership, composition, discovery, Python and resource lifecycle. |
 | [Device contracts](devices.md) | Types, profiles, drivers, frames, motion ownership, world clocks and model services. |
-| [Tools and skills](tools-and-skills.md) | Brief catalog of core's built-in tools and setup-device skill. |
+| [Tools and skills](tools-and-skills.md) | Built-in tools, Python execution with `exec`, feedback loops and setup-device. |
 | [Setup, calibration and ROS](setup.md) | Task prerequisites, calibration evidence, provisioning generations and dependencies. |
 | [Agent integration and context](agent-integration.md) | Tools, device guidance, permissions, sessions, recording, compaction and Pi resources. |
 | [Installation and releases](distribution.md) | Package versions, the curl installer, upgrades and validation. |

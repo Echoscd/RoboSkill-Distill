@@ -16,8 +16,10 @@ creates `~/.local/bin/kinex`. PATH changes require confirmation.
 | `kinex update <source>` | One installed package. |
 | `kinex update --all` | Kinex, then installed packages. |
 
-Self-update handles installer-managed installations; source and linked installs
-stay unchanged. Installation and updates never downgrade newer versions. Failed
+Self-update handles npm release installations, including the installer's prefix,
+global npm installs and local projects with a direct Kinex dependency. It rejects
+source checkouts and linked installs with instructions to update and rebuild them.
+The installer and Kinex self-update never downgrade a newer Kinex version. Failed
 npm installs report recovery commands.
 
 ## Releases and validation

@@ -58,7 +58,8 @@ kinex
 ```
 
 Use `/login` to connect a model provider and `/model` to choose a model.
-Python tools and drivers also need Python 3 and uv; video encoding requires ffmpeg.
+Default Python tools and drivers use a uv-managed Python ≥3.11 environment;
+install uv before first use. Video encoding requires ffmpeg.
 
 You can also run a single task, resume a session, or update from the shell:
 
