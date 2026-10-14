@@ -1,8 +1,6 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/kinex-logo-text-night.svg">
-    <img src="assets/kinex-logo-text-day.svg" alt="Kinex" height="100">
-  </picture>
+  <img src="assets/kinex-logo-text-day.svg#gh-light-mode-only" alt="Kinex" height="100">
+  <img src="assets/kinex-logo-text-night.svg#gh-dark-mode-only" alt="Kinex" height="100">
 </p>
 
 <p align="center">
