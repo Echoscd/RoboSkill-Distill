@@ -41,8 +41,9 @@ are available through `kinex.args()`, and `argv` supplies script arguments.
 Scripts use `device(deviceID, action="read", args=None)` for one call and
 `devices(calls=[...])` for concurrent calls. Batch entries use `deviceID`, `action`
 and `args`, and results preserve input order with per-call errors.
-`call("servo", device="arm", joints=target)` composes a Python tool using keyword
-arguments. Host coding tools are outside this Python composition API.
+`call("servo", device="left_arm", joints=target)` composes a Python tool using keyword
+arguments, using the [RoboTwin workspace](../README.md#use-kinex-with-simulators).
+Host coding tools are outside this Python composition API.
 
 Use bounded Python loops for feedback control and settling checks. The former
 `closed_loop` and `settled` built-ins are no longer provided; their control flow,

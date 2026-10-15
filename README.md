@@ -66,7 +66,7 @@ You can also run a single task, resume a session, or update from the shell:
 
 ```sh
 kinex "Inspect the workspace"          # Start with a prompt
-kinex run "/ping arm"                  # Run once without a model
+kinex run "/ping left_arm"             # Run once without a model
 kinex run "Describe the scene"         # Run a task and exit; -p also works
 kinex --continue                       # Resume the latest project session
 kinex --resume                         # Choose a previous session
@@ -102,34 +102,61 @@ for more detail.
 [RoboEnv](https://github.com/stacx-lab/RoboEnv) runs simulator tasks and exposes
 their robots as Kinex devices. Follow its
 [setup guide](https://github.com/stacx-lab/RoboEnv/blob/main/docs/setup.md), then
-launch a RoboCasa scene with the RoboEnv CLI activated:
+start the RoboTwin Aloha AgileX block-handover task from the RoboEnv checkout:
 
 ```sh
-roboenv prepare robocasa
-roboenv launch robocasa/pick-place-microwave --port 8123
+source .venv/bin/activate
+roboenv prepare robotwin
+roboenv launch robotwin/handover-block-aloha-agilex --port 8123
 ```
 
-Wait for `Ready` and leave it running. In another terminal, activate the same
-RoboEnv CLI and set up a Kinex workspace:
+Wait for `Ready` and leave it running. In another terminal, activate the RoboEnv
+CLI and create a Kinex workspace:
 
 ```sh
 source /path/to/RoboEnv/.venv/bin/activate
 mkdir -p kinex-sim-workspace
 cd kinex-sim-workspace
-roboenv setup robocasa/robocasa-panda-omron
+roboenv setup robotwin/robotwin-aloha-agilex
 export ROBOENV_ENDPOINT=http://127.0.0.1:8123
+roboenv describe --endpoint "$ROBOENV_ENDPOINT"
 kinex
 ```
 
-Replace `/path/to/RoboEnv` with your checkout location. `roboenv setup` creates
-`.kinex/` if needed and exports the robot's `workspace.yaml` and devices.
-Then ask Kinex:
+Replace `/path/to/RoboEnv` with your checkout. Setup exports the robot into
+`.kinex/` and protects existing configuration. This rig has `left_arm`,
+`right_arm`, `left_gripper`, `right_gripper`, `head_camera`, `left_camera`,
+`right_camera`, and `world`.
 
-> Look through the robot's cameras and describe what is in the scene.
+In Kinex, run `/devices` and `/ping all`, then ask:
 
-See the
-[RoboEnv walkthrough](https://github.com/stacx-lab/RoboEnv/blob/main/docs/kinex-local.md)
-for more tasks, connection details, and recording.
+> Read the running task instruction with `roboenv describe`, inspect the three
+> cameras, and complete the block handover using the robot's devices. Check
+> measured feedback after motion.
+
+The task runs in realtime and stops on native success. Use
+`--execution-mode stepped` at launch to advance simulation through world waits.
+`/stop` cancels agent work and stops actuators within their scope; Ctrl-C in the
+RoboEnv terminal closes the simulator. After restarting an episode, restart Kinex
+or run `/unload all` followed by `/load all` to reconnect.
+
+To record observations in the Kinex TUI (requires FFmpeg):
+
+```text
+/record start head_camera=2 left_camera=2 right_camera=2 left_arm=5 right_arm=5 handover
+/record status
+/record stop
+```
+
+Start recording before the attempt and stop it afterward. Recording captures
+observations; RoboEnv's native verifier determines task success. For owner-side
+spectator videos, add `--record` to `roboenv launch`.
+
+Use `roboenv tasks list --simulator robotwin` for the other Aloha AgileX tasks.
+See the [RoboEnv walkthrough](https://github.com/stacx-lab/RoboEnv/blob/main/docs/kinex-local.md)
+for workspace refresh and recording details, or the
+[Python control example](packages/core/README.md#feedback-control-with-exec)
+for bounded feedback loops.
 
 ## Kinex and the Pi Ecosystem
 

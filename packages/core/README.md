@@ -7,7 +7,8 @@ Core provisions, registers, removes and operates devices independently of
 `@kinex/setup`. It includes device guides, driver templates, setup-device, lifecycle,
 control, perception, kinematics, recording and runtime Python.
 Onboarding and calibration procedures live in
-[`@kinex/setup`](../setup/README.md).
+[`@kinex/setup`](../setup/README.md). Arm and camera examples below use the RoboTwin
+Aloha AgileX workspace from the [simulator walkthrough](../../README.md#use-kinex-with-simulators).
 
 ```ts
 import { createKinexRuntime } from "@kinex/core"
@@ -26,7 +27,7 @@ try {
   const { tools, problems } = await runtime.tools.list()
   // Register schemas with the host and route each invocation to tools.call.
   const context = await runtime.context()
-  const result = await runtime.tools.call("device", { deviceID: "camera" }, {
+  const result = await runtime.tools.call("device", { deviceID: "head_camera" }, {
     sessionID: "host-session", callID: "host-call", signal: new AbortController().signal,
   })
   // result includes text, error status, metadata and optional image attachments.
@@ -105,7 +106,7 @@ Python uses the same request fields and result layouts:
 ```python
 from kinex import device, devices
 
-request = {"deviceID": "camera", "action": "read", "args": {"output": "file"}}
+request = {"deviceID": "head_camera", "action": "read", "args": {"output": "file"}}
 frame = device(**request)         # data fields directly, plus optional file
 batch = devices(calls=[request])  # {"results": [{deviceID, action, ok, data/file or error}]}
 ```
@@ -243,22 +244,24 @@ Use `exec` for bounded feedback loops and return observations with control resul
 The `closed_loop` and `settled` built-ins are no longer provided. Replace their
 stage mappings and persistent loop state with Python variables, explicit device
 or tool calls, and task-specific feedback checks.
-For example, for an arm with bounded revolute joints, pass target `joints` and a
-positive `tolerance_rad` in the exec arguments:
+For RoboTwin's `left_arm`, pass a six-element target `joints` vector and a positive
+`tolerance_rad` in the exec arguments. Targets are absolute radians in profile
+order; choose them for the observed scene. The example returns the head and left
+wrist images:
 
 ```python
 from kinex import args, call, device, finish, stop_owned
 
 params = args()
 try:
-    initial = device("arm")
+    initial = device("left_arm")
     if initial["faults"]:
         raise RuntimeError(str(initial["faults"]))
     previous_stamp = initial["timestamp"]
-    motion = call("servo", device="arm", joints=params["joints"])
+    motion = call("servo", device="left_arm", joints=params["joints"])
     # Blocking servo already waited its planned duration. Check fresh feedback.
     for _ in range(20):
-        feedback = device("arm")
+        feedback = device("left_arm")
         if feedback["faults"]:
             raise RuntimeError(str(feedback["faults"]))
         if feedback["timestamp"] < previous_stamp:
@@ -275,12 +278,12 @@ try:
 finally:
     stop_owned()
 
-feedback = device("arm")
+feedback = device("left_arm")
 head = device("head_camera", args={"output": "file"})
-wrist = device("wrist_camera", args={"output": "file"})
+wrist = device("left_camera", args={"output": "file"})
 finish({"feedback": feedback, "cameras": [
     {"deviceID": "head_camera", "timestamp": head["timestamp"]},
-    {"deviceID": "wrist_camera", "timestamp": wrist["timestamp"]},
+    {"deviceID": "left_camera", "timestamp": wrist["timestamp"]},
 ]},
        file=[head["file"], wrist["file"]])
 ```
@@ -444,7 +447,7 @@ Optional `description` supplies a short lowercase TUI label, such as `inspect ar
 ```json
 {
   "description": "inspect arm and camera",
-  "python": "from kinex import device, finish\nstate = device('arm')\nframe = device('camera', args={'output': 'file'})\nfinish({'arm': state, 'camera': 'camera', 'timestamp': frame['timestamp']}, file=frame['file'])"
+  "python": "from kinex import device, finish\nstate = device('left_arm')\nframe = device('head_camera', args={'output': 'file'})\nfinish({'arm': state, 'camera': 'head_camera', 'timestamp': frame['timestamp']}, file=frame['file'])"
 }
 ```
 
@@ -453,7 +456,7 @@ Files run from the runtime's working directory, with normal script-local imports
 directory. For example:
 
 ```json
-{"file": "scripts/inspect.py", "argv": ["--samples", "10"], "args": {"device": "arm"}}
+{"file": "scripts/inspect.py", "argv": ["--samples", "10"], "args": {"device": "left_arm"}}
 ```
 
 `args` defaults to `{}` and is available through `kinex.args()`; `argv` defaults to
@@ -487,7 +490,7 @@ the original failure is returned; successful completion may leave submitted
 motion running. Use `kinex.stop_owned()` to request a stop and receive cleanup
 errors, including in a `finally` block around a control loop.
 
-`call("servo", device="arm", joints=target)` and `call("servo", **params)`
+`call("servo", device="left_arm", joints=target)` and `call("servo", **params)`
 use keyword arguments, not a positional dictionary. In contrast,
 `device("world", "wait", {"duration_s": duration})` accepts an argument dictionary.
 `call` composes Python tools or `device`/`devices`, not host tools such as shell
@@ -504,7 +507,7 @@ from `sys.argv` must migrate to these helpers. Executable paths and `--serve` st
 in argv; payload size no longer selects a transport.
 
 Internal camera reads default to NumPy arrays. For file-based consumers, use
-`frame = device("camera", args={"output": "file"})` and pass `frame["file"]`
+`frame = device("head_camera", args={"output": "file"})` and pass `frame["file"]`
 directly in the next tool or model-device call's arguments. Python variables
 carry intermediate observations between computation and control steps.
 Internal reads do not automatically display images; return selected files through

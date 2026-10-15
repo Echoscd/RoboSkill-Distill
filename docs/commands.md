@@ -37,11 +37,12 @@ reconnect the whole collection. `/reload` refreshes agent resources only.
 ### Recording and session export
 
 Capture device observations with `/record` and preserve the conversation with
-Pi's `/export`.
+Pi's `/export`. These examples use the
+[RoboTwin workspace](../README.md#use-kinex-with-simulators).
 
 | Command                         | Purpose                                                                    |
 | ------------------------------- | -------------------------------------------------------------------------- |
-| `/record start arm=10 camera=2` | Start recording arm observations at 10 Hz and camera observations at 2 Hz. |
+| `/record start left_arm=10 head_camera=2` | Record the left arm at 10 Hz and head camera at 2 Hz. |
 | `/record snap <devices ...>`    | Capture a one-time snapshot of the named devices.                          |
 | `/record stop`                  | Finish and save the active recording.                                      |
 | `/record status`                | Show active and recent recordings.                                         |
@@ -79,7 +80,8 @@ Use `--auto` to approve tool permissions while retaining user questions, or
 to the model. To record a non-interactive task:
 
 ```sh
-kinex -p --record "arm=10 camera=2" "prompt"
+kinex -p --record "left_arm=10 head_camera=2" \
+  "Inspect the RoboTwin scene and describe the block and target pad."
 ```
 
 See [device contracts](devices.md), [recording](agent-integration.md#recording) and
