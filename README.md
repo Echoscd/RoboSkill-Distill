@@ -101,8 +101,28 @@ for more detail.
 
 [RoboEnv](https://github.com/stacx-lab/RoboEnv) runs simulator tasks and exposes
 their robots as Kinex devices. Follow its
-[setup guide](https://github.com/stacx-lab/RoboEnv/blob/main/docs/setup.md), then
-start the RoboTwin Aloha AgileX block-handover task from the RoboEnv checkout:
+[setup guide](https://github.com/stacx-lab/RoboEnv/blob/main/docs/setup.md).
+Choose a task and its paired robot/device configuration from the RoboEnv checkout:
+
+```sh
+source .venv/bin/activate
+roboenv tasks list --simulator robotwin
+roboenv robots list --simulator robotwin
+```
+
+Each command prints one ID per line; omit `--simulator` to see all entries, or
+add `--json` for structured output. `launch` takes a **task ID** and `setup` takes
+its **robot ID**. Read `robot:` in RoboEnv's
+`catalog/tasks/<task-id>/task.yaml` to find the exact paired device collection;
+one simulator can have several robots or scene configurations.
+
+| Task ID for `roboenv launch` | Robot ID for `roboenv setup` |
+| --- | --- |
+| `robotwin/handover-block-aloha-agilex` | `robotwin/robotwin-aloha-agilex` |
+| `robocasa/load-condiments-in-fridge` | `robocasa/robocasa-panda-omron` |
+| `abc/hang-mug-on-mug-rack` | `abc/abc-yam` |
+
+For the RoboTwin pair, prepare the simulator and launch the task in the first terminal:
 
 ```sh
 source .venv/bin/activate
@@ -124,11 +144,14 @@ kinex
 ```
 
 Replace `/path/to/RoboEnv` with your checkout. Setup exports the robot into
-`.kinex/` and protects existing configuration. This rig has `left_arm`,
+`.kinex/` and protects existing configuration. `prepare` installs simulator
+dependencies and assets, `launch` starts the task, and `setup` exports its paired
+devices without starting a simulator. Match `ROBOENV_ENDPOINT` to the endpoint
+printed by `launch`. This rig has `left_arm`,
 `right_arm`, `left_gripper`, `right_gripper`, `head_camera`, `left_camera`,
 `right_camera`, and `world`.
 
-In Kinex, run `/devices` and `/ping all`, then ask:
+In Kinex, run `/devices`, `/load all`, and `/ping all`, then ask:
 
 > Read the running task instruction with `roboenv describe`, inspect the three
 > cameras, and complete the block handover using the robot's devices. Check
@@ -152,7 +175,9 @@ Start recording before the attempt and stop it afterward. Recording captures
 observations; RoboEnv's native verifier determines task success. For owner-side
 spectator videos, add `--record` to `roboenv launch`.
 
-Use `roboenv tasks list --simulator robotwin` for the other Aloha AgileX tasks.
+Reuse this workspace for tasks with the same robot ID. For a different robot,
+create a new workspace or save custom configuration before running
+`roboenv setup ROBOT_ID --force`, which replaces the manifest and device collection.
 See the [RoboEnv walkthrough](https://github.com/stacx-lab/RoboEnv/blob/main/docs/kinex-local.md)
 for workspace refresh and recording details, or the
 [Python control example](packages/core/README.md#feedback-control-with-exec)
