@@ -22,6 +22,7 @@
 </p>
 
 <p align="center">
+  <a href="https://stacx-lab.github.io/kinex/docs/">Documentation</a> ·
   <a href="#news">News</a> ·
   <a href="#getting-started">Getting Started</a> ·
   <a href="#use-kinex-with-simulators">Simulators</a> ·
@@ -33,6 +34,9 @@
 Kinex is a robotics harness for coding agents, built on the published Pi SDK.
 Its three layers—**devices**, **tools**, and **skills**—provide environment access,
 executable operations, and task guidance.
+
+Read the [documentation website](https://stacx-lab.github.io/kinex/docs/) for
+setup guides, concepts and command references.
 
 <p align="center">
   <img src="assets/architecture.svg" alt="Kinex architecture: agents load skills and call tools or devices, whose drivers connect to hardware, simulators and services." width="640">
@@ -75,12 +79,13 @@ kinex update                           # Update Kinex and its bundled Pi SDK
 kinex --help                           # All commands and options
 ```
 
-See the [command reference](docs/commands.md) for in-session commands.
+See the [command reference](https://stacx-lab.github.io/kinex/docs/slash-commands/)
+for in-session commands.
 
 ## Use Kinex with Simulators
 
 [RoboEnv](https://github.com/stacx-lab/RoboEnv) exposes simulated robots as Kinex
-devices. Follow its [installation guide](https://github.com/stacx-lab/RoboEnv/blob/main/docs/setup.md),
+devices. Follow the [simulator setup guide](https://stacx-lab.github.io/kinex/docs/simulators/#1-launch-a-simulator),
 then prepare RoboTwin and launch the block-handover task from the RoboEnv checkout:
 
 ```sh
@@ -120,7 +125,7 @@ To try other tasks,
 use `roboenv tasks list --simulator robotwin` and
 `roboenv robots list --simulator robotwin`; the task YAML's `robot:` field gives
 its paired robot ID. See the
-[RoboEnv walkthrough](https://github.com/stacx-lab/RoboEnv/blob/main/docs/kinex-local.md)
+[simulator walkthrough](https://stacx-lab.github.io/kinex/docs/simulators/)
 for more setup and connection details.
 
 ## Use Kinex with Real-World Robots
@@ -140,7 +145,7 @@ If the task needs additional calibration, request its scope, for example
 
 Once ready, give Kinex the task in plain language. Use `/stop` to cancel the
 response and stop actuators within their declared scope, or `/unload <device>`
-to release a device. See [setup and calibration](packages/setup/README.md#tools-and-workflows)
+to release a device. See [onboarding and calibration](https://stacx-lab.github.io/kinex/docs/onboarding/)
 for more detail.
 
 ## Kinex and the Pi Ecosystem
@@ -180,10 +185,12 @@ Plugin releases and their bundled core versions are updated independently.
 ## Contributing & Development
 
 Issues and pull requests are welcome. Read [AGENTS.md](AGENTS.md) for contribution
-rules and the [design documentation](docs/README.md) for package boundaries and
-runtime contracts.
-The [core](packages/core/README.md) and [setup](packages/setup/README.md) docs cover
-APIs, control examples and onboarding.
+rules, [architecture](https://stacx-lab.github.io/kinex/docs/architecture/#packages)
+for package boundaries, and [runtime documentation](https://stacx-lab.github.io/kinex/docs/runtime/)
+for workspace discovery and resource lifecycle.
+The [device](https://stacx-lab.github.io/kinex/docs/devices/) and
+[onboarding](https://stacx-lab.github.io/kinex/docs/onboarding/) guides cover
+device control, setup and calibration.
 
 For source development:
 
