@@ -24,8 +24,8 @@
 <p align="center">
   <a href="#news">News</a> ·
   <a href="#getting-started">Getting Started</a> ·
-  <a href="#use-kinex-with-real-world-robots">Real-World Robots</a> ·
   <a href="#use-kinex-with-simulators">Simulators</a> ·
+  <a href="#use-kinex-with-real-world-robots">Real-World Robots</a> ·
   <a href="#kinex-and-the-pi-ecosystem">Pi Ecosystem</a> ·
   <a href="#using-kinex-with-other-harnesses">Other Harnesses</a>
 </p>
@@ -77,6 +77,52 @@ kinex --help                           # All commands and options
 
 See the [command reference](docs/commands.md) for in-session commands.
 
+## Use Kinex with Simulators
+
+[RoboEnv](https://github.com/stacx-lab/RoboEnv) exposes simulated robots as Kinex
+devices. Follow its [installation guide](https://github.com/stacx-lab/RoboEnv/blob/main/docs/setup.md),
+then prepare RoboTwin and launch the block-handover task from the RoboEnv checkout:
+
+```sh
+source .venv/bin/activate
+roboenv prepare robotwin
+roboenv launch robotwin/handover-block-aloha-agilex --port 8123 --record ./recordings/demo
+```
+
+The `--record ./recordings/demo` option records the episode as videos in that
+directory (requires FFmpeg). Omit it if you do not want to record.
+
+Wait for `Ready` and leave it running. In a second terminal, create a workspace
+and export the task's paired Aloha AgileX devices. `launch` takes the **task ID**;
+`setup` takes its **robot ID**:
+
+```sh
+source /path/to/RoboEnv/.venv/bin/activate
+mkdir -p kinex-sim-workspace
+cd kinex-sim-workspace
+roboenv setup robotwin/robotwin-aloha-agilex
+export ROBOENV_ENDPOINT=http://127.0.0.1:8123
+kinex
+```
+
+Replace `/path/to/RoboEnv` with your checkout. In Kinex, run `/load all` and
+`/ping all`, then ask:
+
+> Use the left arm to grasp the red block on the table, hand it over to the right
+> arm, and set it down in the center of the blue pad. Release it with the right
+> gripper open.
+
+After the task finishes, press Ctrl-C in the RoboEnv terminal to close the
+simulator. If you'd like to review the handover, inspect the recorded videos in
+`recordings/demo` under your RoboEnv checkout.
+
+To try other tasks,
+use `roboenv tasks list --simulator robotwin` and
+`roboenv robots list --simulator robotwin`; the task YAML's `robot:` field gives
+its paired robot ID. See the
+[RoboEnv walkthrough](https://github.com/stacx-lab/RoboEnv/blob/main/docs/kinex-local.md)
+for more setup and connection details.
+
 ## Use Kinex with Real-World Robots
 
 Open Kinex in your robot workspace and describe your hardware, how it connects,
@@ -96,47 +142,6 @@ Once ready, give Kinex the task in plain language. Use `/stop` to cancel the
 response and stop actuators within their declared scope, or `/unload <device>`
 to release a device. See [setup and calibration](packages/setup/README.md#tools-and-workflows)
 for more detail.
-
-## Use Kinex with Simulators
-
-[RoboEnv](https://github.com/stacx-lab/RoboEnv) exposes simulated robots as Kinex
-devices. Follow its [installation guide](https://github.com/stacx-lab/RoboEnv/blob/main/docs/setup.md),
-then prepare RoboTwin and launch the block-handover task from the RoboEnv checkout:
-
-```sh
-source .venv/bin/activate
-roboenv prepare robotwin
-roboenv launch robotwin/handover-block-aloha-agilex --port 8123
-```
-
-To record the episode as videos, add `--record ./recordings/demo` to the launch
-command (requires FFmpeg). RoboEnv saves the videos in that directory.
-
-Wait for `Ready` and leave it running. In a second terminal, create a workspace
-and export the task's paired Aloha AgileX devices. `launch` takes the **task ID**;
-`setup` takes its **robot ID**:
-
-```sh
-source /path/to/RoboEnv/.venv/bin/activate
-mkdir -p kinex-sim-workspace
-cd kinex-sim-workspace
-roboenv setup robotwin/robotwin-aloha-agilex
-export ROBOENV_ENDPOINT=http://127.0.0.1:8123
-kinex
-```
-
-Replace `/path/to/RoboEnv` with your checkout. In Kinex, run `/load all` and
-`/ping all`, then ask:
-
-> Read the task instruction with `roboenv describe`, inspect the cameras, and
-> complete the block handover using the robot's devices.
-
-Press Ctrl-C in the RoboEnv terminal to close the simulator. To try other tasks,
-use `roboenv tasks list --simulator robotwin` and
-`roboenv robots list --simulator robotwin`; the task YAML's `robot:` field gives
-its paired robot ID. See the
-[RoboEnv walkthrough](https://github.com/stacx-lab/RoboEnv/blob/main/docs/kinex-local.md)
-for more setup and connection details.
 
 ## Kinex and the Pi Ecosystem
 
