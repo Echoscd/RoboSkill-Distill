@@ -12,7 +12,7 @@ repository root.
 | `packages/core` | Device management, non-ROS provisioning, schemas, runtime Python, operational tools, setup-device and device guides. No setup, ROS, agent or UI dependency. |
 | `packages/setup` | Onboarding, calibration, ROS provisioning/adapters and dependency checks. Imports core through package exports. |
 | `src`, `src/integration` | Standalone CLI, storage and product policy. Published Pi SDKs supply providers, coding tools, agent loops and TUI. |
-| `../kinex-plugins` | Separate native Pi, OpenCode and Codex integrations consuming explicit packed core snapshots. |
+| `../kinex-plugins` | Plugins for Pi, Claude Code and Codex using a shared MCP adapter and explicit packed core/setup snapshots. |
 
 `KinexContribution` exposes tools, skills, commands and namespaced context. Hosts
 compose contributions explicitly; new interaction or lifecycle semantics need

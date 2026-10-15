@@ -172,15 +172,21 @@ packages. Browse [Pi packages](https://pi.dev/packages) or read the
 
 ## Using Kinex with Other Harnesses
 
-We also provide plugins for Pi, OpenCode and Codex that package Kinex's core
-utilities—including device tools, skills and robot context—for use within those
-harnesses. They are maintained in the separate
+Kinex plugins currently support **Pi, Claude Code and Codex**. They package Kinex's
+device tools, skills and robot context through a shared MCP adapter, with Pi also
+providing direct lifecycle commands and UI integration. They are maintained in the separate
 [kinex-plugins repository](https://github.com/stacx-lab/kinex-plugins).
+OpenCode is not currently supported.
 
 Choose your harness there, follow its installation and configuration instructions,
-then open your robot workspace in that harness. Plugins use the shared Kinex core
-while retaining the host's coding workflow; standalone Kinex is not required.
-Plugin releases and their bundled core versions are updated independently.
+then open your robot workspace in that harness and explicitly request “Start
+Kinex.” Use “Show Kinex status” to inspect the runtime and “End Kinex” to release
+devices while keeping the host open. Pi also provides `/kinex-start`,
+`/kinex-status` and `/kinex-end` as direct commands.
+
+Plugins retain the host's coding workflow and use host-managed approvals by
+default; standalone Kinex is not required. Plugin releases and their bundled
+core/setup snapshots are updated independently.
 
 ## Contributing & Development
 

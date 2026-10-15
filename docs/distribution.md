@@ -25,7 +25,9 @@ npm installs report recovery commands.
 ## Releases and validation
 
 Core, setup and standalone share a version with exact internal dependencies.
-Native plugins release independently and consume checksummed core snapshots.
+Plugins for Pi, Claude Code and Codex release independently in
+[kinex-plugins](https://github.com/stacx-lab/kinex-plugins) and consume checksummed
+core/setup snapshots.
 Release archives include SHA-256 checksums.
 
 `npm run check` covers core, setup, standalone, PTY behavior and packed consumers.

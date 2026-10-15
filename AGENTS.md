@@ -14,7 +14,7 @@ Design history and progress belong in git.
   or dependency. Setup borrows core runtime resources through package exports.
 - `src` composes standalone with published Pi SDKs; `src/integration` owns its
   product policy. Do not fork/reimplement providers, coding tools, loops or TUI.
-- Native Pi, OpenCode and Codex plugins live in the separate `../kinex-plugins`
+- Plugins for Pi, Claude Code and Codex live in the separate `../kinex-plugins`
   project. Standalone owns its Pi integration in `src/integration`; do not import
   plugin packages or constrain standalone SDK upgrades to plugin compatibility.
 - Core is the shared package boundary. Plugins consume explicit packed snapshots;
