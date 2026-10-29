@@ -84,10 +84,12 @@ def test_composes_builder_and_generic_solver_with_legacy_fields():
         observed_at_s=1,
         valid_for_s=5,
         position_uncertainty_m=0.01,
+        collision_context_path="scene.json",
         waypoint_builder=builder,
         sequence_solver=solver,
     )
     assert calls["solver"]["pairs"][0]["arm"] == "left_arm"
+    assert calls["solver"]["collision_context_path"] == "scene.json"
     assert calls["solver"]["pose_sequence_variants"][0]["variant_id"] == "tangent_0"
     assert result["selected_arm"] == "left_arm"
     assert result["press_joints"] == [3] * 6

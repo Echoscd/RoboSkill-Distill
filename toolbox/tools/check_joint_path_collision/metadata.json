@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "name": "check_joint_path_collision",
+  "version": "0.2.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-29",
+  "updated_at": "2026-10-29",
+  "summary": "Reject active-arm environment, non-adjacent self and stationary other-arm overlaps at joint-path samples.",
+  "tool_type": "atomic",
+  "domains": ["planning", "collision", "verification"],
+  "generality": {
+    "score": 7,
+    "rationale": "Task-independent joint-path predicate, limited to world-mounted revolute serial chains and static box obstacles.",
+    "assumptions": ["Public URDF collision geometry matches the profile and observed obstacles cover the relevant environment."],
+    "limitations": ["Conservative mesh boxes may overreject; samples can miss continuous collisions.", "Directly adjacent active links are excluded; no fixed-chassis, passive/gripper or synchronized dual-arm checks.", "Other arms are static measured snapshots; partial scene maps leave unseen space unknown."],
+    "tested_tasks": ["Synthetic rotated-box, self, stationary inter-arm and joint-path regression fixtures", "Recorded turn-switch failed approach, offline public model replay; no new task success claim"]
+  },
+  "level": {"score": 4, "rationale": "One deterministic physical predicate using FK, mesh bounds and sampled box intersection."},
+  "composition": {"dependencies": [], "strategy": ""},
+  "provenance": {
+    "experiment": "turn-switch",
+    "iteration": "cleanup_transfer_collision_repair",
+    "failure_gap": "Complete endpoint IK accepted a forearm configuration intersecting the table.",
+    "evidence": ["failure_20261029_turn_switch_collision", "Recorded approach FK and STL vertices penetrate the offline tabletop regression box."]
+  }
+}

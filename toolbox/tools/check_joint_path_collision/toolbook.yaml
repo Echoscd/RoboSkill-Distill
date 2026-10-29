@@ -1,0 +1,128 @@
+schema_version: 1
+name: check_joint_path_collision
+version: 0.2.0
+summary: Conservative environment, non-adjacent self and stationary other-arm collision rejection.
+usage:
+  when_to_use: [Reject IK-feasible configurations or segments that intersect modeled obstacles.]
+  when_not_to_use: [Certifying complete robot safety or a dynamic contact interaction.]
+  prerequisites:
+    - Obtain a current serial_chain profile with world mount and one revolute joint per link.
+    - Supply a public URDF matching profile joint names, axes, origins, and zero references.
+    - Model relevant obstacles from calibrated perception or an explicitly supplied scene model; record observation IDs and validity.
+    - Do not obtain hidden simulator object poses or evaluator internals for agent planning.
+  examples:
+    - name: check_candidate
+      arguments:
+        arm: CURRENT_ARM_ID
+        start_joints: [MEASURED_JOINT_ANGLES_IN_PROFILE_ORDER]
+        joint_stages:
+          - {stage: approach, joints: [CANDIDATE_JOINT_ANGLES_IN_PROFILE_ORDER]}
+        collision_context_path: CURRENT_MEASURED_SCENE_JSON_PATH
+        collision_margin_m: MEASURED_GEOMETRY_ERROR_BOUND
+parameters:
+  arm:
+    meaning: Arm whose active child links move along the candidate path. All other context arms are read as stationary snapshots.
+    format: Non-empty loaded joint-device ID.
+    unit: null
+    frame: world-mounted profile
+    source: Device inventory and profile.
+    constraints: [URDF joint order and profile chain must agree.]
+    do_not: [Do not treat unlisted arms or gripper and fixed-chassis geometry as included.]
+  start_joints:
+    meaning: Beginning configuration; tested even when all targets equal the start.
+    format: Finite numeric array with one value per profile joint.
+    unit: rad
+    frame: profile joint order
+    source: Current measured device read, not a prior command.
+    constraints: [All values within declared profile limits.]
+    do_not: [Do not replace a failed arrival with its desired target.]
+  joint_stages:
+    meaning: Ordered target configurations joined by straight lines in joint space; every endpoint and segment sample is checked.
+    format: Array of 1-16 objects containing stage:string and joints:number[].
+    unit: rad
+    frame: profile joint order
+    source: Candidate IK results or an explicit path.
+    constraints: [Same dimensions and limits as start_joints; at most 20000 total samples.]
+    do_not: [Do not assume a Cartesian-linear or controller trajectory equals this interpolation.]
+  collision_context_path:
+    meaning: JSON document from build_scene_collision_context or declared geometry. Other listed arm profiles and measured states are read through normal device APIs; no implicit simulator scene lookup.
+    format: Local file path; schema and nested fields described in context_format.
+    unit: null
+    frame: world
+    source: Trusted public robot model and current calibrated perception or user-supplied scene geometry.
+    constraints: [Non-empty obstacle list; no unsupported geometry silently skipped.]
+    do_not: [Do not invent obstacle coordinates, copy regression coordinates, or omit a relevant obstacle to force a clear result.]
+  collision_margin_m:
+    meaning: Conservative robot-box half-extent inflation against environment obstacles; not applied to self or inter-arm pairs.
+    format: Finite number in [0,0.1]; default 0.005.
+    unit: m
+    frame: each link collision bound
+    source: Geometry uncertainty budget; this tool cannot estimate it.
+    constraints: [Solver adds its upstream position_uncertainty_m to this padding.]
+    do_not: [Do not call this a guaranteed Euclidean separation distance.]
+  robot_pair_margin_m:
+    meaning: Separate per-link local-axis padding for self and stationary inter-arm checks; excludes target perception uncertainty.
+    format: Finite number in [0,0.1], default 0.
+    unit: m
+    frame: Each robot collision geometry local axes.
+    source: Robot geometry/calibration budget; default checks nominal convex geometry without claiming calibration accuracy.
+    constraints: [Both links are inflated by this amount; narrow gaps may conservatively fail.]
+    do_not: [Do not copy target localization error into this field or reduce a justified robot budget solely to accept a plan.]
+  max_joint_step_rad:
+    meaning: Per-axis maximum step for joint-linear sampling; smaller values test more configurations.
+    format: Finite number in (0,0.1]; default 0.025.
+    unit: rad
+    frame: profile joints
+    source: Collision sampling policy.
+    constraints: [Sampling can miss between-sample collisions at any nonzero step.]
+    do_not: [Do not interpret this as speed or continuous-time certification.]
+context_format:
+  frame: Must equal world.
+  provenance: Non-empty string identifying measured/calibrated scene source; self-reported provenance is not independently authenticated.
+  based_on: Non-empty array of current observation IDs for obstacle geometry.
+  observed_at_s: Acquisition time in current session seconds, nonnegative.
+  expires_at_s: Same session clock, strictly greater than observed_at_s. Caller must check freshness against current session time.
+  arms: Mapping of every modeled loaded arm ID to an object containing urdf_path. Relative paths resolve beside the context file. Other arms are read for a stationary snapshot check; read errors fail the check.
+  urdf_path: Public URDF; active joint child links must have box or local STL collision geometry. Mesh paths resolve beside URDF; positive mesh scale supported. Other formats fail explicitly.
+  obstacles: Non-empty array of static boxes, each with unique id, pose_world and size_m. Include relevant environment geometry; coverage is a caller responsibility.
+  pose_world: Seven finite numbers [x,y,z,qx,qy,qz,qw]; position in meters, nonzero quaternion normalized internally.
+  size_m: Three strictly positive full side lengths [x,y,z] in meters in obstacle local axes.
+  coverage: Optional observed-map coverage, preserved exactly in results. Unseen, occluded, robot-filtered and interior space remains unknown; absence of a voxel is not evidence of free space.
+  symbolic_example:
+    frame: world
+    provenance: CALIBRATED_SCENE_SOURCE
+    based_on: [CURRENT_SCENE_OBSERVATION_ID]
+    observed_at_s: CURRENT_SCENE_TIME
+    expires_at_s: CURRENT_SCENE_EXPIRY
+    arms:
+      CURRENT_ARM_ID: {urdf_path: PUBLIC_MATCHING_ROBOT_URDF_PATH}
+    obstacles:
+      - id: OBSERVED_SUPPORT_SURFACE
+        pose_world: [CX, CY, CZ, QX, QY, QZ, QW]
+        size_m: [SX, SY, SZ]
+returns:
+  status: overlap or clear_at_samples; overlapping mesh bounds can be false positives.
+  collision_free_at_samples: True only for tested geometry and samples; includes non-adjacent active self links and supplied stationary other-arm snapshots. Unknown-space traversal is not certified.
+  first_overlap: First rejected stage, fraction, joints, collision_type and exact environment obstacle or robot link pair; null when clear.
+  samples_tested: Number of configurations actually tested before returning.
+  evidence: Checked link/obstacle IDs, context/model SHA256, margin, step and observation provenance.
+  execution_validated: Always null; continuous collision, gripper/fixed-chassis geometry, synchronized dual-arm motion, dynamics and task effect are outside scope.
+  self_collision_checked: Non-adjacent active child-link pairs only. Same-link and directly adjacent pairs are excluded due to intentional joint overlap; no additional silent exclusions.
+  robot_pair_narrow_phase: OBB broad phase followed by convex mesh hull support-plane separation with the same local-axis padding. Concave geometry remains conservatively enclosed; unresolved or degenerate pairs are rejected. This does not identify an exact triangle contact pair.
+  inter_arm_collision_checked: True when other-arm profiles and measured state snapshots were checked. All those arms must remain stationary throughout the candidate motion.
+  other_arm_snapshots: Measured joint arrays and session timestamps used for each other arm; snapshots are not coordinated trajectories.
+  unmodeled_arms: Context arm IDs not included in the supplied other-arm snapshots; runtime entrypoints supply all declared arms or fail.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: INVALID_MODEL_OR_SCENE
+      symptom: Explicit error for missing geometry, frame mismatch, unsupported shape or malformed context.
+      cause: Input cannot support the advertised check; no clear result is fabricated.
+  recovery:
+    - Inspect first_overlap; generate another task-valid configuration, orientation, arm, or path upstream.
+    - If conservative bounds block a truly clear path, use a validated higher-fidelity collision planner.
+    - Missing scene geometry requires a new observation or explicit model; repeated IK cannot establish clearance.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py, test_recorded_regression.py]

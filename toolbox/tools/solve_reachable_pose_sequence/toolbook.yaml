@@ -1,6 +1,6 @@
 schema_version: 1
 name: solve_reachable_pose_sequence
-version: 0.1.0
+version: 0.3.0
 summary: >-
   Task-independent arm/effector selection and chained IK over complete ordered
   TCP-pose variants. Grasp, place, and contact builders can share this solver.
@@ -78,6 +78,38 @@ parameters:
     source: Upstream perception/calibration estimate.
     constraints: [Must cover every variant.]
     do_not: [Do not silently replace an unknown value with zero.]
+  collision_context_path:
+    meaning: Optional measured obstacle scene and public robot geometry. Reject environment and non-adjacent self overlap; read all other declared arms for stationary snapshot checks.
+    format: Local JSON file; full nested schema in ../check_joint_path_collision/toolbook.yaml context_format.
+    unit: null
+    frame: world
+    source: Current calibrated perception or explicitly supplied scene model plus public URDF.
+    constraints: [Context observation IDs are merged into returned based_on, Context validity interval must cover the declared plan interval, Unsupported or missing supplied geometry rejects the candidate rather than falling back to IK-only.]
+    do_not: [Do not query hidden simulator object poses, Do not interpret omission as a clear scene.]
+  collision_margin_m:
+    meaning: Additional link-bound half-extent padding; upstream position_uncertainty_m is added.
+    format: Number in [0,0.1], default 0.005; sum with uncertainty must not exceed 0.1.
+    unit: m
+    frame: local collision bounds
+    source: Geometry and calibration uncertainty budget.
+    constraints: [No automatic scene uncertainty estimate is available.]
+    do_not: [Do not reduce merely to force acceptance.]
+  robot_pair_margin_m:
+    meaning: Per-link padding for self and stationary other-arm checks, independent of target perception uncertainty and environment clearance.
+    format: Finite number in [0,0.1], default 0.
+    unit: m
+    frame: Robot collision geometry local axes.
+    source: Robot geometry/calibration error budget; default tests nominal geometry only.
+    constraints: [No automatic robot calibration uncertainty estimate is available.]
+    do_not: [Do not add position_uncertainty_m to robot-pair padding or infer real-hardware safety from zero padding.]
+  max_joint_step_rad:
+    meaning: Maximum per-joint step between collision samples from measured start through all ordered targets.
+    format: Number in (0,0.1], default 0.025.
+    unit: rad
+    frame: profile joints
+    source: Sampling policy.
+    constraints: [Only joint-linear interpolation is tested; at most 20000 samples.]
+    do_not: [Do not equate sampled clearance with the actual controller trajectory.]
   variant_id:
     meaning: Stable identifier for one task-defined orientation or path variant.
     format: Unique non-empty string within this call.
@@ -103,9 +135,13 @@ parameters:
     constraints: [TCP is the paired effector profile TCP, not the arm flange.]
     do_not: [Do not pass flange poses, camera-frame poses, pixels, or Euler angles.]
 returns:
+  ik_feasible: True for the returned complete IK candidate; this is not an execution guarantee.
+  plan_valid: Null. A scoped collision check cannot certify whole-robot or task validity.
+  execution_validated: Null; this tool performs no motion.
+  collision_validation: unverified when context omitted; otherwise clear_at_samples with geometry hashes, bounds, robot snapshots, partial coverage and scope. Overlap rejects a candidate and is retained in candidate_failures.
   selected_arm: First base-ranked arm that solves one complete variant.
   selected_effector: Mounted TCP effector paired with selected_arm.
-  selected_variant_id: Complete task-defined variant that passed every stage.
+  selected_variant_id: Complete variant that passed IK and any supplied scoped collision checks.
   joint_stages: Ordered stage, TCP pose, flange pose, and chained joint target records.
   candidate_failures: Rejected pair/variant records with exact failed_stage and reason.
   provenance: based_on, timing, expiry, frame, and uncertainty are preserved.
@@ -121,7 +157,10 @@ failure_handling:
   recovery:
     - Inspect candidate_failures and recheck only the failed geometry or capability.
     - Generate additional task-valid variants upstream; never delete required later stages to make selection pass.
+    - A colliding endpoint requires a different IK branch, orientation or arm; path detours alone cannot clear that endpoint. This tool searches supplied variants and arms, not arbitrary IK branches or detours.
     - Use a collision-aware or force-aware planner when discrete IK is insufficient.
+    - Observed depth maps cover visible surfaces only. Resolve important unknown or occluded regions with fresh observations; no fixed camera sequence is imposed.
+    - Other-arm snapshots require those arms to remain stationary; synchronized dual-arm planning needs a time-aligned multi-arm trajectory checker.
 source:
   entrypoint: tool.py
   implementation: [core.py]

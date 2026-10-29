@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "plan_reachable_linear_contact",
-  "version": "0.2.1",
+  "version": "0.4.0",
   "status": "experimental",
   "formulated_by": "gpt",
   "created_at": "2026-10-29",
@@ -13,7 +13,7 @@
     "score": 5,
     "rationale": "Object-independent IK composition, but no physical contact feature is modeled; successful press transfer is unvalidated.",
     "assumptions": ["Straight surface-normal contact is suitable and TCP-origin targeting matches the intended physical contact feature.", "Discrete chained IK is only a kinematic endpoint test."],
-    "limitations": ["No finger/pad selection, aperture-dependent contact geometry, continuous collision checking, force control, execution, or effect verification.", "Use other waypoint builders for grasping and placing."],
+    "limitations": ["No finger/pad selection, aperture-dependent contact geometry, gripper/fixed-chassis or continuous collision certification, force control, execution, or effect verification.", "Self checking covers non-adjacent active links; other arms are stationary snapshots. Missing scene context leaves clearance unknown; unseen space remains unknown.", "Use other waypoint builders for grasping and placing."],
     "tested_tasks": ["robotwin/press-stapler-aloha-agilex (behavior refactored after harness_v2 iter_005; runtime regression pending)"]
   },
   "level": {
@@ -22,7 +22,7 @@
   },
   "composition": {
     "dependencies": ["build_linear_contact_waypoints", "solve_reachable_pose_sequence"],
-    "strategy": "Build four task-valid linear-contact TCP variants, solve each complete sequence across base-ranked arm-effector pairs, and expose legacy fields for existing experiment scripts."
+    "strategy": "Build four linear-contact TCP variants, solve each complete sequence across base-ranked arm-effector pairs, optionally reject sampled arm/environment overlaps, and expose explicit IK and collision evidence."
   },
   "provenance": {
     "experiment": "press-stapler",

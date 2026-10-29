@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "failure_id": "failure_20261029_turn_switch_collision",
+  "occurred_at": "2026-10-29T10:39:14Z",
+  "tool": {"name": "plan_reachable_linear_contact", "version": "0.2.1", "kind": "perception"},
+  "call": {"arguments": {
+    "arm_effector_pairs": [{"arm": "left_arm", "effector": "left_gripper"}],
+    "contact_point_world_m": [-0.009, 0.072, 0.848],
+    "surface_outward_normal_world": [0, -1, 0],
+    "preferred_tangent_axis_world": [0, 0, 1],
+    "approach_distance_m": 0.12, "press_distance_m": 0.02,
+    "observation_id": "obs_000111", "observed_at_s": 22,
+    "valid_for_s": 30, "position_uncertainty_m": 0.01
+  }},
+  "error": {"stage": "verification", "code": "IK_ENDPOINT_ENVIRONMENT_COLLISION", "message": "Tool returned plan_valid=true without collision validation; approach failed measured arrival with max joint error about 1.83 rad."},
+  "trace": {"run_id": "20261029_cleanup_transfer_seed0", "session_id": "945616f75c9d7b58", "trace_ref": "experiment/turn-switch/runs/autonomous/20261029_cleanup_transfer_seed0/agent/primary-session.jsonl#L35-L51"},
+  "diagnosis": {"status": "reviewed", "category": "planner_collision_design_gap", "root_cause": "First complete chained IK was returned without testing active link geometry. Offline public-model FK places link3 STL vertices inside the original table box at the requested endpoint.", "confidence": "confirmed_by_source_and_offline_geometry", "episode_causality": "Endpoint collision is confirmed. Exact first runtime contact pair was not recorded. Target writes reached the backend; this record does not infer a transport rejection."},
+  "resolution": {"status": "resolved", "tool_version": "0.3.0", "change_log_ref": "tools/plan_reachable_linear_contact/changes.jsonl", "notes": "Scoped repair: generic solver rejects arm/environment box overlaps at joint-linear samples when public model and measured scene context are supplied. Missing context is explicitly unverified; no scene geometry is guessed. Self/gripper and continuous collision remain outside scope; no new native task-success claim."},
+  "artifacts": ["toolbox/tools/check_joint_path_collision/test_recorded_regression.py"]
+}

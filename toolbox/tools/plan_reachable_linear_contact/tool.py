@@ -28,8 +28,13 @@ def main() -> None:
             observed_at_s=float(values["observed_at_s"]),
             valid_for_s=float(values.get("valid_for_s", 5.0)),
             position_uncertainty_m=float(values["position_uncertainty_m"]),
+            collision_context_path=values.get("collision_context_path"),
+            collision_margin_m=float(values.get("collision_margin_m", 0.005)),
+            max_joint_step_rad=float(values.get("max_joint_step_rad", 0.025)),
+            robot_profile_call=profile,
+            robot_pair_margin_m=float(values.get("robot_pair_margin_m", 0)),
         ))
-    except (KeyError, TypeError, ValueError) as exc:
+    except (OSError, KeyError, TypeError, ValueError) as exc:
         fail(str(exc))
 
 

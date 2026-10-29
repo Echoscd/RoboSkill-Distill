@@ -1,0 +1,50 @@
+name: check_joint_path_collision
+version: 0.2.0
+title: Check Joint Path Collision
+kind: perception
+description: >-
+  Check active arm-link bounds against declared scene boxes, non-adjacent links
+  of the same arm, and measured stationary snapshots of other context arms
+  at joint-linear samples, including the measured start and every target.
+  Local STL bounds are conservative: overlap rejects a candidate but can be a
+  false positive. Clear samples do not certify unseen space, gripper geometry,
+  synchronized dual-arm motion, continuous motion, contact or task success. Read-only.
+parameters:
+  type: object
+  additionalProperties: false
+  required: [arm, start_joints, joint_stages, collision_context_path]
+  properties:
+    arm: {type: string, minLength: 1, description: Loaded world-mounted revolute joint device ID.}
+    start_joints:
+      type: array
+      minItems: 1
+      items: {type: number}
+      description: Measured start angles in radians, in profile joint order.
+    joint_stages:
+      type: array
+      minItems: 1
+      maxItems: 16
+      items:
+        type: object
+        additionalProperties: false
+        required: [stage, joints]
+        properties:
+          stage: {type: string, minLength: 1, description: Name of the segment-ending waypoint.}
+          joints: {type: array, minItems: 1, items: {type: number}, description: Target angles in radians in the same profile joint order.}
+      description: Ordered targets; each segment is checked from the preceding target.
+    collision_context_path:
+      type: string
+      minLength: 1
+      description: Scene JSON from build_scene_collision_context or declared calibrated boxes with public URDF paths. All listed arms are read for static inter-arm checks. Empty scenes are rejected.
+    collision_margin_m: {type: number, minimum: 0, maximum: 0.1, default: 0.005, description: Extra per-axis half-extent padding of each robot-link bound in meters; include geometry uncertainty.}
+    robot_pair_margin_m: {type: number, minimum: 0, maximum: 0.1, default: 0, description: Separate local-axis padding per robot link for self and inter-arm checks in meters; zero checks nominal convex geometry only. Not target perception uncertainty.}
+    max_joint_step_rad: {type: number, exclusiveMinimum: 0, maximum: 0.1, default: 0.025, description: Largest per-joint increment between tested configurations in radians; not continuous certification.}
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 60
+requires: intrinsics:model,extrinsics:mount

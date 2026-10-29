@@ -1,28 +1,28 @@
 {
   "schema_version": 1,
   "name": "solve_reachable_pose_sequence",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "status": "experimental",
   "formulated_by": "gpt",
   "created_at": "2026-10-29",
   "updated_at": "2026-10-29",
-  "summary": "Select an arm-effector pair and solve chained IK for an entire task-defined TCP-pose sequence.",
-  "tool_type": "atomic",
+  "summary": "Select complete chained-IK pose sequences with optional scoped arm/environment collision rejection.",
+  "tool_type": "composite",
   "domains": ["planning", "inverse-kinematics", "manipulator-selection", "recovery"],
   "generality": {
-    "score": 10,
-    "rationale": "Consumes generic ordered TCP poses and physical arm-effector pairs without knowing whether the task is grasping, placing, pressing, or another motion primitive.",
+    "score": 7,
+    "rationale": "Task-independent pose sequences; collision validation currently requires world-mounted revolute serial chains and declared static box obstacles. Score reduced to reflect this implemented scope.",
     "assumptions": ["Discrete chained IK across task-complete waypoints is a useful feasibility test."],
-    "limitations": ["No continuous collision checking, dynamics, force control, motion execution, or task-effect verification."],
-    "tested_tasks": ["robotwin/press-stapler-aloha-agilex (selection behavior extracted from harness_v2 multi-arm planner)"]
+    "limitations": ["Self checks cover non-adjacent active links only; other arms are stationary snapshots.", "No gripper, fixed chassis, synchronized dual-arm or continuous collision certification, dynamics, motion execution or task-effect verification.", "Without an explicit scene/model context, collision clearance remains unknown; observed maps can leave important unseen space."],
+    "tested_tasks": ["robotwin/press-stapler-aloha-agilex (selection behavior extracted from harness_v2 multi-arm planner)", "Synthetic collision rejection and candidate continuation; recorded turn-switch geometry replay"]
   },
   "level": {
-    "score": 5,
-    "rationale": "Ranks physical candidates, transforms TCP poses through profiles and frames, and solves every ordered stage with chained seeds."
+    "score": 6,
+    "rationale": "Composes pair ranking and chained IK with scoped collision rejection for the complete joint sequence."
   },
   "composition": {
-    "dependencies": [],
-    "strategy": ""
+    "dependencies": ["check_joint_path_collision"],
+    "strategy": "Solve each complete candidate, reject sampled arm/obstacle overlaps when a context is supplied, and continue to other variants or arms."
   },
   "provenance": {
     "experiment": "press-stapler",

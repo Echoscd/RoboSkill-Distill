@@ -1,11 +1,14 @@
 name: solve_reachable_pose_sequence
-version: 0.1.0
+version: 0.3.0
 title: Solve Reachable Pose Sequence
 kind: perception
 description: >-
   Select an arm-effector pair and pose-sequence variant by solving chained IK
-  for every ordered world-frame TCP waypoint. A candidate is accepted only if
-  the entire sequence is reachable. This tool never moves the robot.
+  for every ordered world-frame TCP waypoint. With collision_context_path,
+  reject environment, non-adjacent self and stationary other-arm overlap at
+  joint-linear samples and try other candidates. Other arms must stay stationary.
+  Without it, collision clearance is unverified. ik_feasible does not imply
+  execution safety; plan_valid remains unknown. This tool never moves the robot.
 parameters:
   type: object
   additionalProperties: false
@@ -55,6 +58,13 @@ parameters:
     observed_at_s: {type: number, minimum: 0}
     expires_at_s: {type: number, exclusiveMinimum: 0}
     position_uncertainty_m: {type: number, minimum: 0, maximum: 0.05}
+    collision_context_path:
+      type: string
+      minLength: 1
+      description: Optional JSON scene/model file; see check_joint_path_collision/toolbook.yaml. Its obstacle observation IDs are merged into returned based_on and its validity must cover this plan. Omission returns unverified clearance.
+    collision_margin_m: {type: number, minimum: 0, maximum: 0.1, default: 0.005, description: Link-bound padding in meters; position_uncertainty_m is added conservatively.}
+    robot_pair_margin_m: {type: number, minimum: 0, maximum: 0.1, default: 0, description: Separate per-link padding for self and static-other-arm checks in meters. Zero checks nominal robot geometry only; target uncertainty is not added.}
+    max_joint_step_rad: {type: number, exclusiveMinimum: 0, maximum: 0.1, default: 0.025, description: Maximum per-joint interpolation step for sampled collision checks in radians; no continuous guarantee.}
   required:
     - arm_effector_pairs
     - pose_sequence_variants

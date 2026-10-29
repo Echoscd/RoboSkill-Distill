@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tool_count": 8,
+  "tool_count": 10,
   "tools": [
     {
       "name": "list_device_inventory",
@@ -83,6 +83,23 @@
       "change_log": "tools/build_linear_contact_waypoints/changes.jsonl"
     },
     {
+      "name": "check_joint_path_collision",
+      "version": "0.2.0",
+      "status": "experimental",
+      "tool_type": "atomic",
+      "generality": 7,
+      "level": 4,
+      "dependencies": [],
+      "summary": "Reject active-arm environment, non-adjacent self and stationary other-arm overlaps at joint-path samples.",
+      "tested_tasks": [
+        "Synthetic rotated-box, self, stationary inter-arm and joint-path regression fixtures",
+        "Recorded turn-switch failed approach, offline public model replay; no new task success claim"
+      ],
+      "interface": "tools/check_joint_path_collision/tool.yaml",
+      "toolbook": "tools/check_joint_path_collision/toolbook.yaml",
+      "change_log": "tools/check_joint_path_collision/changes.jsonl"
+    },
+    {
       "name": "wait_for_joint_arrival",
       "version": "0.1.0",
       "status": "experimental",
@@ -101,16 +118,38 @@
       "change_log": "tools/wait_for_joint_arrival/changes.jsonl"
     },
     {
-      "name": "solve_reachable_pose_sequence",
+      "name": "build_scene_collision_context",
       "version": "0.1.0",
       "status": "experimental",
-      "tool_type": "atomic",
-      "generality": 10,
+      "tool_type": "composite",
+      "generality": 7,
       "level": 5,
-      "dependencies": [],
-      "summary": "Select an arm-effector pair and solve chained IK for an entire task-defined TCP-pose sequence.",
+      "dependencies": [
+        "check_joint_path_collision"
+      ],
+      "summary": "Build partial observed surface occupancy from registered depth and synchronized public robot geometry.",
       "tested_tasks": [
-        "robotwin/press-stapler-aloha-agilex (selection behavior extracted from harness_v2 multi-arm planner)"
+        "Synthetic calibrated depth, invalid pixels, voxel and synchronized robot-filter regression fixtures",
+        "Recorded turn-switch 320x240 PGM projection and voxel smoke: 76800 returns, 2456 occupied surface cells; full synchronized real-camera robot-filter test remains pending"
+      ],
+      "interface": "tools/build_scene_collision_context/tool.yaml",
+      "toolbook": "tools/build_scene_collision_context/toolbook.yaml",
+      "change_log": "tools/build_scene_collision_context/changes.jsonl"
+    },
+    {
+      "name": "solve_reachable_pose_sequence",
+      "version": "0.3.0",
+      "status": "experimental",
+      "tool_type": "composite",
+      "generality": 7,
+      "level": 6,
+      "dependencies": [
+        "check_joint_path_collision"
+      ],
+      "summary": "Select complete chained-IK pose sequences with optional scoped arm/environment collision rejection.",
+      "tested_tasks": [
+        "robotwin/press-stapler-aloha-agilex (selection behavior extracted from harness_v2 multi-arm planner)",
+        "Synthetic collision rejection and candidate continuation; recorded turn-switch geometry replay"
       ],
       "interface": "tools/solve_reachable_pose_sequence/tool.yaml",
       "toolbook": "tools/solve_reachable_pose_sequence/toolbook.yaml",
@@ -118,7 +157,7 @@
     },
     {
       "name": "plan_reachable_linear_contact",
-      "version": "0.2.1",
+      "version": "0.4.0",
       "status": "experimental",
       "tool_type": "composite",
       "generality": 5,

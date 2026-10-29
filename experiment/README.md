@@ -15,6 +15,29 @@ The default model is OpenRouter `qwen/qwen3.8-max-0902`. Set
 `KINEX_EXPERIMENT_MODEL` to override it. Use `KINEX_DRY_RUN=1` to render and check
 the task prompt without credentials, simulator launch, or model calls.
 
+## Full installed RoboTwin catalog
+
+```bash
+/path/to/robotwin/python experiment/benchmark/run_suite.py \
+  --batch-dir experiment/benchmark/runs/UNIQUE_BATCH_ID --seed 0
+```
+
+The runner selects all catalog tasks for `robotwin-aloha-agilex` and runs them
+serially through the same launcher with `demo_clean`, no seed substitution,
+recording, native evaluation, and video-first failure analysis. This is a
+single-seed coverage pass using the practice control adapter, not an official
+multi-seed benchmark score. Model and timeout overrides use the shared
+`KINEX_EXPERIMENT_*` environment variables.
+
+Each batch retains `suite-manifest.json`, `suite-state.json`,
+`suite-events.jsonl`, `suite-results.json`, and one complete run per task.
+Instructions with unresolved catalog placeholders use the upstream public
+`full_description`, with both versions and their source recorded explicitly.
+The runner rejects source changes between tasks and preserves incomplete
+attempts on resume. Creating `STOP_AFTER_CURRENT` inside the batch directory
+stops the queue after the current task finishes. A file lock permits one suite
+driver at a time because the current runtime shares device profiles.
+
 ## Source map
 
 - `runtime/`: shared environment setup, tool deployment, simulator lifecycle and model execution.

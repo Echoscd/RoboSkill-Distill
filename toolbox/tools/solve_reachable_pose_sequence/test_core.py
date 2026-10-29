@@ -100,6 +100,10 @@ def test_rejects_partial_sequences_and_switches_arm():
     assert result["execution_order"] == ["approach", "action", "retreat"]
     assert result["joint_stages"][1]["joints"] == [2.0] * 6
     assert all(item["failed_stage"] == "action" for item in result["candidate_failures"])
+    assert result["ik_feasible"] is True
+    assert result["plan_valid"] is None
+    assert result["execution_validated"] is None
+    assert result["collision_validation"]["status"] == "unverified"
 
 
 def test_validates_complete_contract_without_motion():
@@ -123,3 +127,52 @@ def test_validates_complete_contract_without_motion():
         except ValueError:
             continue
         raise AssertionError(f"expected ValueError for {patch}")
+
+
+def test_collision_rejection_continues_variant_search():
+    core = load_core()
+    calls = []
+    context = {"based_on": ["scene_obs"], "observed_at_s": 0, "expires_at_s": 20, "arms": {}}
+    core._collision.load_context = lambda path: context
+
+    class Checker:
+        def __init__(self, arm, profile, context, **kwargs):
+            assert abs(kwargs["margin_m"] - .015) < 1e-9
+            assert kwargs["robot_pair_margin_m"] == 0
+
+        def check(self, start, stages):
+            calls.append((start, stages))
+            if len(calls) == 1:
+                return {"collision_free_at_samples": False, "status": "overlap",
+                    "first_overlap": {"stage": "approach", "link": "elbow", "obstacle_id": "support"}}
+            return {"collision_free_at_samples": True, "status": "clear_at_samples"}
+
+    core._collision.ArmCollisionChecker = Checker
+    result = core.solve_reachable_pose_sequence(
+        pairs=[pair("left", -.3)], pose_sequence_variants=variants(), based_on=["obs"],
+        observed_at_s=1, expires_at_s=6, position_uncertainty_m=.01,
+        collision_context_path="fixture.json",
+        device_call=lambda name, action, values=None: {"positions": [0]*6} if action == "read" else {"joints": [0.1]*6},
+    )
+    assert result["selected_variant_id"] == "b"
+    assert result["candidate_failures"][0]["collision_validation"]["status"] == "overlap"
+    assert result["collision_validation"]["status"] == "clear_at_samples"
+    assert result["plan_valid"] is None  # Scoped clearance is not full plan certification.
+    assert result["based_on"] == ["obs", "scene_obs"]
+
+
+def test_context_invalidity_is_not_silently_downgraded_to_ik_only():
+    core = load_core()
+    for context in (
+        {"based_on": ["obs"], "observed_at_s": 2, "expires_at_s": 20},
+        {"based_on": ["obs"], "observed_at_s": 0, "expires_at_s": 2},
+    ):
+        core._collision.load_context = lambda path: context
+        try:
+            core.solve_reachable_pose_sequence(
+                pairs=[pair("left", -.3)], pose_sequence_variants=variants(), based_on=["obs"],
+                observed_at_s=1, expires_at_s=6, position_uncertainty_m=.01,
+                collision_context_path="fixture.json")
+        except ValueError:
+            continue
+        raise AssertionError("invalid scene silently accepted")

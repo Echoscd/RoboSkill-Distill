@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "failure_count": 8,
+  "failure_count": 9,
   "failures": [
     {
       "failure_id": "failure_20261029034339_fa753bac3b03632e",
@@ -64,6 +64,15 @@
       "stage": "runtime",
       "diagnosis_status": "unreviewed",
       "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029_turn_switch_collision",
+      "occurred_at": "2026-10-29T10:39:14Z",
+      "tool": "plan_reachable_linear_contact",
+      "code": "IK_ENDPOINT_ENVIRONMENT_COLLISION",
+      "stage": "verification",
+      "diagnosis_status": "reviewed",
+      "resolution_status": "resolved"
     },
     {
       "failure_id": "failure_20261029_tcp_contact_feature",

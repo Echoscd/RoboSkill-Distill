@@ -1,5 +1,5 @@
 name: plan_reachable_linear_contact
-version: 0.2.1
+version: 0.4.0
 title: Plan Reachable Linear Contact
 kind: perception
 description: >-
@@ -9,6 +9,9 @@ description: >-
   It never executes motion.
   Nominal contact aligns the TCP origin, not a finger or pad. No aperture-dependent
   contact geometry is modeled; IK success does not establish physical contact.
+  Supply collision_context_path to reject sampled environment, non-adjacent self,
+  and stationary other-arm overlaps; otherwise
+  clearance is unverified. plan_valid and execution_validated remain unknown.
 parameters:
   type: object
   additionalProperties: false
@@ -48,6 +51,13 @@ parameters:
     observed_at_s: {type: number, minimum: 0}
     valid_for_s: {type: number, exclusiveMinimum: 0, maximum: 30, default: 5}
     position_uncertainty_m: {type: number, minimum: 0, maximum: 0.05}
+    collision_context_path:
+      type: string
+      minLength: 1
+      description: Optional measured/calibrated scene JSON plus public URDF paths; see check_joint_path_collision/toolbook.yaml. Scene observation IDs are added to plan provenance; scene validity must cover the plan. Omission gives unverified clearance.
+    collision_margin_m: {type: number, minimum: 0, maximum: 0.1, default: 0.005, description: Link-bound padding in meters; position_uncertainty_m is added conservatively.}
+    robot_pair_margin_m: {type: number, minimum: 0, maximum: 0.1, default: 0, description: Separate per-link self and static-other-arm padding in meters. Zero checks nominal geometry; perception target uncertainty is not added.}
+    max_joint_step_rad: {type: number, exclusiveMinimum: 0, maximum: 0.1, default: 0.025, description: Maximum per-joint interpolation step for collision samples in radians; no continuous guarantee.}
   required:
     - arm_effector_pairs
     - contact_point_world_m

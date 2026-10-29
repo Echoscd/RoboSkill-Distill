@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import importlib.util
+from pathlib import Path
 import uuid
 from typing import Any, Callable
 
@@ -11,6 +13,14 @@ import numpy as np
 from kinex import device
 from kinex.frames import pose as frame_pose
 from kinex.geometry import compose_rt, invert_rt, mount_to_rt, rt_to_pose, xyzq_to_rt
+
+
+_spec = importlib.util.spec_from_file_location(
+    "kinex_toolbox_joint_path_collision_core",
+    Path(__file__).resolve().parents[1] / "check_joint_path_collision" / "core.py",
+)
+_collision = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_collision)
 
 
 class StageSolveError(ValueError):
@@ -97,8 +107,13 @@ def solve_reachable_pose_sequence(
     observed_at_s: float,
     expires_at_s: float,
     position_uncertainty_m: float,
+    collision_context_path: str | None = None,
+    collision_margin_m: float = 0.005,
+    max_joint_step_rad: float = 0.025,
+    robot_pair_margin_m: float = 0.0,
     device_call: Callable[..., dict[str, Any]] = device,
     frame_pose_call: Callable[..., dict[str, Any]] = frame_pose,
+    robot_profile_call: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return the first pair/variant whose entire ordered sequence has chained IK."""
     if not pairs:
@@ -110,6 +125,11 @@ def solve_reachable_pose_sequence(
     if not (0.0 <= position_uncertainty_m <= 0.05):
         raise ValueError("position_uncertainty_m must be in [0, 0.05]")
     variants = _validate_variants(pose_sequence_variants)
+    context = _collision.load_context(collision_context_path) if collision_context_path else None
+    if context is not None:
+        based_on = list(dict.fromkeys([*based_on, *context["based_on"]]))
+        if context["observed_at_s"] > observed_at_s or context["expires_at_s"] < expires_at_s:
+            raise ValueError("collision-context validity must cover the declared plan interval")
     first_point = variants[0]["waypoints"][0]["tcp_pose_world"][:3]
     ranked = sorted(pairs, key=lambda pair: _base_distance_xy(pair, first_point))
     failures: list[dict[str, Any]] = []
@@ -133,6 +153,19 @@ def solve_reachable_pose_sequence(
                 *frame_pose_call("world", arm)["rotation"],
             ])
             start = [float(value) for value in device_call(arm, "read")["positions"]]
+            other_names = [name for name in context["arms"] if name != arm] if context else []
+            pair_profiles = {item["arm"]: item["arm_profile"] for item in pairs}
+            other_profiles = {
+                name: pair_profiles[name] if name in pair_profiles else robot_profile_call(name)
+                for name in other_names
+            }
+            checker = _collision.ArmCollisionChecker(
+                arm, pair["arm_profile"], context, margin_m=collision_margin_m + position_uncertainty_m,
+                max_joint_step_rad=max_joint_step_rad,
+                other_arm_profiles=other_profiles,
+                other_arm_states={name: device_call(name, "read") for name in other_names},
+                robot_pair_margin_m=robot_pair_margin_m,
+            ) if context is not None else None
         except Exception as exc:
             failures.append({
                 "arm": arm,
@@ -157,6 +190,8 @@ def solve_reachable_pose_sequence(
                         joints = result.get("joints")
                         if not isinstance(joints, list):
                             raise ValueError("IK returned no joints")
+                        if len(joints) != len(start) or not np.isfinite(joints).all():
+                            raise ValueError("IK joint output has invalid dimension or non-finite values")
                         seed = [float(value) for value in joints]
                         solved_stages.append({
                             "stage": stage,
@@ -176,9 +211,31 @@ def solve_reachable_pose_sequence(
                 })
                 continue
 
+            collision_report = {"status": "unverified", "collision_free_at_samples": None,
+                "reason": "No collision_context_path supplied; IK feasibility alone is not scene clearance.",
+                "execution_validated": None}
+            if checker is not None:
+                try:
+                    collision_report = checker.check(start, solved_stages)
+                except (KeyError, TypeError, ValueError) as exc:
+                    failures.append({"arm": arm, "effector": effector,
+                        "variant_id": variant["variant_id"], "failed_stage": "collision_validation",
+                        "reason": str(exc)})
+                    continue
+                if not collision_report["collision_free_at_samples"]:
+                    failures.append({"arm": arm, "effector": effector,
+                        "variant_id": variant["variant_id"],
+                        "failed_stage": collision_report["first_overlap"]["stage"],
+                        "reason": "Conservative arm/obstacle overlap; candidate rejected.",
+                        "collision_validation": collision_report})
+                    continue
+
             return {
                 "plan_id": f"reachable_pose_sequence_{uuid.uuid4().hex[:12]}",
-                "plan_valid": True,
+                "ik_feasible": True,
+                "plan_valid": None,
+                "execution_validated": None,
+                "collision_validation": collision_report,
                 "frame": "world",
                 "based_on": list(based_on),
                 "observed_at_s": float(observed_at_s),
@@ -196,10 +253,10 @@ def solve_reachable_pose_sequence(
                 ],
                 "candidates_tested": len(failures) + 1,
                 "candidate_failures": failures,
-                "warning": "Discrete chained IK is verified; continuous collision, dynamics, and task effect require separate validation.",
+                "warning": "IK feasible. Consult collision_validation for scoped sampled environment/self/static-other-arm checks. Unobserved space, gripper geometry, synchronized dual-arm motion, actual controller paths, dynamics, contact and task effects remain unverified.",
             }
 
     raise ValueError(
-        "no arm/effector and pose-sequence variant has complete chained IK: "
+        "no candidate passed complete IK and the requested collision checks: "
         f"{failures}"
     )

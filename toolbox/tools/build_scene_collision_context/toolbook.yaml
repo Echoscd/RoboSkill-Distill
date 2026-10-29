@@ -1,0 +1,186 @@
+schema_version: 1
+name: build_scene_collision_context
+version: 0.1.0
+summary: Measured RGB-D surface occupancy with explicit unknown coverage and robot-return filtering.
+usage:
+  when_to_use: [Create or refresh a collision context from current registered depth observations.]
+  when_not_to_use: [Claim watertight geometry or complete free-space certification from a single view.]
+  prerequisites:
+    - Read camera and arm state during a stationary acquisition; preserve actual IDs and timestamps.
+    - Obtain the camera optical pose in world at acquisition, with the calibrated Kinex frame graph.
+    - Public URDF joint names and link frames must match the live profiles.
+    - Use current observations only; no hidden simulator poses or evaluator information.
+  examples:
+    - name: build_from_current_measurements
+      arguments:
+        observations:
+          - camera: CURRENT_RGBD_CAMERA_ID
+            depth_path: CURRENT_OBSERVATION_DEPTH_PATH
+            observation_id: CURRENT_OBSERVATION_ID
+            observed_at_s: CURRENT_ACQUISITION_TIME
+            camera_pose_world: [TX, TY, TZ, QX, QY, QZ, QW]
+        arm_models:
+          CURRENT_ARM_ID:
+            urdf_path: PUBLIC_MATCHING_URDF_PATH
+            measured_joints: [CURRENT_JOINT_ANGLES_IN_PROFILE_ORDER]
+            measured_at_s: CURRENT_JOINT_TIME
+        output_path: NEW_SCENE_ARTIFACT_JSON_PATH
+        valid_for_s: JUSTIFIED_SCENE_LIFETIME
+        surface_uncertainty_m: MEASURED_GEOMETRY_ERROR_BUDGET
+        depth_range_m: [VALIDATED_MIN_DEPTH, VALIDATED_MAX_DEPTH]
+parameters:
+  observations:
+    meaning: One or more registered depth observations fused as measured occupied surfaces.
+    format: Array of 1-8 objects with camera, depth_path, observation_id, observed_at_s and camera_pose_world.
+    unit: See nested fields.
+    frame: Per-camera optical frame transformed to world.
+    source: Current camera reads and calibrated frame snapshots.
+    constraints: [Unique real observation IDs; synchronized stationary acquisition.]
+    do_not: [Do not mix scenes from before and after object or robot motion.]
+  camera:
+    meaning: Profile used for exact image shape, pinhole intrinsics and depth encoding.
+    format: Loaded RGB-D device ID.
+    unit: null
+    frame: Camera optical coordinates with positive Z forward.
+    source: Device inventory.
+    constraints: [Undistorted pinhole; depth quantity z; registration color; identical RGB and depth dimensions.]
+    do_not: [Do not substitute another camera profile or generic focal length.]
+  depth_path:
+    meaning: Depth pixels for this observation decoded by kinex.camera.read_depth; PGM headers and endian order are honored.
+    format: Local pgm16_be uint16 artifact path.
+    unit: Profile scale_m_per_unit converts raw samples to meters.
+    frame: Associated camera optical frame.
+    source: Exact camera read artifact.
+    constraints: [Shape and format must match profile; file SHA256 is retained.]
+    do_not: [Do not parse PGM with raw reshape or invent image dimensions.]
+  observation_id:
+    meaning: Provenance reference attached to this exact image.
+    format: Non-empty string unique within this call.
+    unit: null
+    frame: Current session.
+    source: Recorded ObservationRef.
+    constraints: [Must match depth_path and timestamp.]
+    do_not: [Do not invent IDs.]
+  observed_at_s:
+    meaning: Image acquisition time, not tool completion time.
+    format: Finite nonnegative number.
+    unit: s
+    frame: Current session clock.
+    source: Camera reading.
+    constraints: [All images and robot snapshots within max_snapshot_skew_s.]
+    do_not: [Do not replace with wall time or alter timestamps to pass freshness checks.]
+  camera_pose_world:
+    meaning: Camera optical frame expressed in world at acquisition; p_world = R * p_camera + t.
+    format: Seven finite numbers [x,y,z,qx,qy,qz,qw]; quaternion normalized internally.
+    unit: m and dimensionless quaternion.
+    frame: Camera to world.
+    source: Calibrated frame graph sampled with the image; retain the acquisition transform for wrist views.
+    constraints: [Transform must match image timestamp; no later moving-camera transform.]
+    do_not: [Do not invert this transform or use the flange pose as the camera pose.]
+  arm_models:
+    meaning: Public geometry plus synchronized measured state for every modeled arm; used only to identify robot sensor returns.
+    format: Mapping from arm ID to urdf_path, measured_joints and measured_at_s.
+    unit: See nested fields.
+    frame: World-mounted revolute serial-chain profiles.
+    source: Public robot model and live joint reads.
+    constraints: [One to four arms; checker rejects mismatched models.]
+    do_not: [Do not assume unlisted robot parts are filtered or collision checked.]
+  urdf_path:
+    meaning: Local public robot model matching profile joint frames; active child links supply collision geometry.
+    format: Absolute or current-working-directory-relative path; saved as absolute.
+    unit: URDF meters.
+    frame: Profile-compatible link frames.
+    source: Public embodiment assets.
+    constraints: [Boxes or local STL meshes; see check_joint_path_collision manual.]
+    do_not: [Do not supply hidden simulator task/object models.]
+  measured_joints:
+    meaning: Actual arm configuration during depth acquisition; used to filter robot returns.
+    format: Finite radian array in profile joint order.
+    unit: rad
+    frame: Profile joints.
+    source: Measured arm read, never a desired command.
+    constraints: [Within profile limits; same scene as images.]
+    do_not: [Do not infer arrival from a write receipt.]
+  measured_at_s:
+    meaning: Joint-state acquisition timestamp.
+    format: Finite nonnegative number.
+    unit: s
+    frame: Same session clock as images.
+    source: Arm reading.
+    constraints: [Within max_snapshot_skew_s of every image.]
+    do_not: [Do not substitute image time without a measurement.]
+  output_path:
+    meaning: New collision-context artifact; output is bounded summary plus path, not thousands of cells in the model context.
+    format: Local JSON file path with existing parent directory.
+    unit: null
+    frame: Filesystem.
+    source: Current experiment artifact directory.
+    constraints: [Exclusive creation; existing artifacts are rejected.]
+    do_not: [Do not overwrite a prior scene or raw trace.]
+  valid_for_s:
+    meaning: Expiry measured from the oldest image; the map must be refreshed after scene-changing action.
+    format: Number in (0,30].
+    unit: s
+    frame: Session clock.
+    source: Scene freshness policy.
+    constraints: [Must exceed the span between the newest and oldest image.]
+    do_not: [Do not lengthen to hide stale data.]
+  surface_uncertainty_m:
+    meaning: Sensor/calibration budget used to expand voxel boxes and filter robot-bound returns.
+    format: Finite number in [0,0.05].
+    unit: m
+    frame: World voxel axes and link-bound axes.
+    source: Sensor/calibration estimate; reliability is not inferred by this tool.
+    constraints: [Larger robot filtering bounds can remove nearby object points; filtered space stays unknown.]
+    do_not: [Do not treat zero as measured certainty without evidence.]
+  depth_range_m:
+    meaning: Explicit range selection applied after profile scaling; profile reliable_range_m is preserved separately even when unknown.
+    format: Two finite numbers [minimum,maximum] with 0 < minimum < maximum.
+    unit: m
+    frame: Optical Z depth.
+    source: Sensor operating range and current planning region.
+    constraints: [Invalid values and out-of-range samples become unknown; no interpolation.]
+    do_not: [Do not equate filtering with sensor validation.]
+  voxel_size_m:
+    meaning: Full side length of axis-aligned world occupancy cells before uncertainty expansion.
+    format: Finite number in [0.005,0.1], default 0.02.
+    unit: m
+    frame: World axes, grid origin world zero.
+    source: Geometry resolution policy.
+    constraints: [One return is enough to occupy a voxel; more than 12000 cells fails explicitly.]
+    do_not: [Do not silently drop sparse cells or automatically remove the task target.]
+  max_snapshot_skew_s:
+    meaning: Maximum acquisition mismatch for camera and robot snapshots; does not bound motion speed during acquisition.
+    format: Finite number in [0,1], default 0.1.
+    unit: s
+    frame: Session clock.
+    source: Sensor synchronization tolerance.
+    constraints: [Capture while stationary; moving captures need motion compensation not implemented here.]
+    do_not: [Do not widen merely to combine incompatible frames.]
+  roi_world_m:
+    meaning: Optional region bounding retained surface points; omitted points remain unknown.
+    format: Object with min and max three-number corners; each max greater than min.
+    unit: m
+    frame: World axes.
+    source: Explicit planning region grounded in calibrated geometry.
+    constraints: [ROI is recorded in coverage; it provides no safety claim outside itself.]
+    do_not: [Do not crop an obstacle away just to obtain a clear plan.]
+returns:
+  collision_context_path: New file consumable by check_joint_path_collision and generic pose planners.
+  coverage: Explicit partial-surface scope with unknown occluded, invalid, robot-filtered and interior space; no free-space certification.
+  evidence: Observation IDs, acquisition poses/times, depth/calibration hashes and point-filter counts.
+  obstacles: Stored in artifact as occupied voxel boxes; no hidden task geometry or evaluator data.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: INVALID_OR_EMPTY_SCENE
+      symptom: Missing calibration, unsupported depth model, stale snapshots, no retained points or oversized map.
+      cause: Observations cannot support the requested map at this configuration.
+  recovery:
+    - Obtain a fresh view or synchronized measurements; preserve unknown values.
+    - Inspect coverage before planning. Reobserve to resolve important occlusion; no fixed camera sequence is imposed.
+    - Contact with a target needs a contact-aware policy; the target is not silently removed from occupancy.
+source:
+  entrypoint: tool.py
+  implementation: [core.py, ../check_joint_path_collision/core.py]
+  tests: [test_core.py, test_recorded_rgbd.py]

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "name": "build_scene_collision_context",
+  "version": "0.1.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-29",
+  "updated_at": "2026-10-29",
+  "summary": "Build partial observed surface occupancy from registered depth and synchronized public robot geometry.",
+  "tool_type": "composite",
+  "domains": ["perception", "collision", "scene-mapping"],
+  "generality": {
+    "score": 7,
+    "rationale": "Object-independent measured surfaces across tasks; restricted to undistorted registered pinhole RGB-D and supported serial-chain robot models.",
+    "assumptions": ["Stationary synchronized acquisition, valid calibration and explicit sensor error budget."],
+    "limitations": ["Partial surface occupancy; unseen space and object interiors remain unknown.", "Conservative arm filtering can remove nearby object points; grippers and fixed chassis are unmodeled.", "No semantic object reconstruction or free-space certification."],
+    "tested_tasks": ["Synthetic calibrated depth, invalid pixels, voxel and synchronized robot-filter regression fixtures", "Recorded turn-switch 320x240 PGM projection and voxel smoke: 76800 returns, 2456 occupied surface cells; full synchronized real-camera robot-filter test remains pending"]
+  },
+  "level": {"score": 5, "rationale": "Compose calibrated depth reconstruction, robot geometry filtering and occupied voxel context construction."},
+  "composition": {"dependencies": ["check_joint_path_collision"], "strategy": "Use public link FK bounds to filter measured robot returns; voxelize remaining observed world surfaces and retain provenance and unknown coverage."},
+  "provenance": {
+    "experiment": "turn-switch",
+    "iteration": "scene_and_robot_collision_extension",
+    "failure_gap": "Known-obstacle checks lack automatic measured scene coverage and cannot detect unmodeled clutter.",
+    "evidence": ["failure_20261029_turn_switch_collision", "User requested observed environment, self and dual-arm collision support."]
+  }
+}

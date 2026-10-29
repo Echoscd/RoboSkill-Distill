@@ -42,7 +42,8 @@ toolbox/
 The active catalog contains the current experiment's dependency closure: device
 inventory, gripper contracts, contact waypoint construction, complete-sequence
 IK selection, reachable contact composition, measured joint arrival, arrival
-polling, and recorded-video inspection. Earlier bottle/color/stacking planners
+polling, measured RGB-D surface maps, conservative environment/self/static-other-arm
+collision checks, and recorded-video inspection. Earlier bottle/color/stacking planners
 and speed-selection trials are recoverable through Git and the external backup
 listed in `experiment/archive-index.json`. Historical failure records remain
 immutable even when the referenced tool version has been retired.

@@ -1,6 +1,6 @@
 schema_version: 1
 name: plan_reachable_linear_contact
-version: 0.2.1
+version: 0.4.0
 summary: >-
   Compatibility combo over build_linear_contact_waypoints and
   solve_reachable_pose_sequence. Contact semantics stay in the builder while
@@ -34,7 +34,7 @@ usage:
 parameters:
   arm_effector_pairs:
     meaning: Candidate physical arm and mounted-effector pairs.
-    format: Array of 1-4 objects, each exactly {arm: string, effector: string}.
+    format: 'Array of 1-4 objects, each exactly {arm: string, effector: string}.'
     unit: null
     frame: null
     source: list_device_inventory and device mount profiles.
@@ -112,7 +112,43 @@ parameters:
     source: Perception/calibration estimate for observation_id.
     constraints: [Must describe the same point estimate.]
     do_not: [Do not set zero without an explicit measurement guarantee.]
+  collision_context_path:
+    meaning: Optional static obstacle scene and public robot model passed unchanged to the generic solver.
+    format: Local JSON path; schema in ../check_joint_path_collision/toolbook.yaml context_format.
+    unit: null
+    frame: world
+    source: Current calibrated observation or explicitly supplied scene geometry; public matching URDF.
+    constraints: [Scene observation IDs are merged with observation_id in returned based_on, Context validity must cover observed_at_s through observed_at_s plus valid_for_s.]
+    do_not: [Do not infer obstacle clearance from IK alone, Do not use hidden native scene state or copied regression coordinates.]
+  collision_margin_m:
+    meaning: Additional collision-bound half-extent padding beyond position_uncertainty_m.
+    format: Number in [0,0.1], default 0.005; total padding must not exceed 0.1.
+    unit: m
+    frame: local collision bounds
+    source: Geometry uncertainty budget.
+    constraints: [Passed to the generic solver.]
+    do_not: [Do not substitute approach clearance or press depth.]
+  robot_pair_margin_m:
+    meaning: Separate per-link self and stationary other-arm padding, passed to the generic solver without target uncertainty.
+    format: Finite number in [0,0.1], default 0.
+    unit: m
+    frame: Robot collision geometry local axes.
+    source: Robot geometry/calibration error budget; default nominal geometry has no calibration guarantee.
+    constraints: [Both robot links are padded independently.]
+    do_not: [Do not substitute contact-point uncertainty or interpret zero as verified hardware safety.]
+  max_joint_step_rad:
+    meaning: Maximum per-joint step for checking the nominal joint-linear path through the complete sequence.
+    format: Number in (0,0.1], default 0.025.
+    unit: rad
+    frame: profile joint order
+    source: Sampling policy.
+    constraints: [Checks cover non-adjacent self links and stationary other arms; gripper and continuous collision are not certified.]
+    do_not: [Do not interpret it as velocity.]
 returns:
+  ik_feasible: True for a returned complete IK solution.
+  collision_validation: Generic solver environment, non-adjacent self and stationary other-arm report; unverified without context. Observed maps retain unknown coverage. Rejected overlaps remain in candidate_failures.
+  plan_valid: Null; legacy unconditional true has been removed.
+  execution_validated: Null; no robot execution is performed.
   contact_model: TCP-origin reference; physical contact feature and physical contact verification are unknown.
   selected_arm: Arm with a complete chained-IK solution.
   selected_effector: Effector matched to selected_arm.

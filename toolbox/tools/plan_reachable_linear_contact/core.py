@@ -44,6 +44,11 @@ def plan_reachable_linear_contact(
     observed_at_s: float,
     valid_for_s: float,
     position_uncertainty_m: float,
+    collision_context_path: str | None = None,
+    collision_margin_m: float = 0.005,
+    max_joint_step_rad: float = 0.025,
+    robot_profile_call: Callable[..., dict[str, Any]] | None = None,
+    robot_pair_margin_m: float = 0.0,
     waypoint_builder: Callable[..., dict[str, Any]] = build_linear_contact_waypoints,
     sequence_solver: Callable[..., dict[str, Any]] = solve_reachable_pose_sequence,
 ) -> dict[str, Any]:
@@ -66,6 +71,11 @@ def plan_reachable_linear_contact(
         observed_at_s=waypoint_set["observed_at_s"],
         expires_at_s=waypoint_set["expires_at_s"],
         position_uncertainty_m=waypoint_set["position_uncertainty_m"],
+        collision_context_path=collision_context_path,
+        collision_margin_m=collision_margin_m,
+        max_joint_step_rad=max_joint_step_rad,
+        robot_profile_call=robot_profile_call,
+        robot_pair_margin_m=robot_pair_margin_m,
     )
     stages = {item["stage"]: item for item in solved["joint_stages"]}
     required = ("approach", "contact", "press", "retreat")
@@ -82,7 +92,7 @@ def plan_reachable_linear_contact(
         "waypoint_set_id": waypoint_set["waypoint_set_id"],
         "motion_semantics": waypoint_set["motion_semantics"],
         "contact_model": waypoint_set["contact_model"],
-        "warning": "Discrete IK only. The contact stage places the TCP origin at the supplied point; no physical finger/pad contact feature or aperture geometry is modeled. IK success does not establish contact, collision clearance, force, or task effect.",
+        "warning": "IK feasible; inspect collision_validation for sampled arm/obstacle clearance. The contact stage places the TCP origin at the supplied point; no physical finger/pad contact feature or aperture geometry is modeled. Collision samples do not certify execution, physical contact, force, or task effect.",
         "contact_point_world_m": waypoint_set["contact_point_world_m"],
         "surface_outward_normal_world": waypoint_set["surface_outward_normal_world"],
         "approach_direction_world": waypoint_set["approach_direction_world"],
