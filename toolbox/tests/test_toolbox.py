@@ -38,15 +38,15 @@ class ToolboxTests(unittest.TestCase):
     def test_equal_or_higher_dependency_level_is_rejected(self) -> None:
         records = toolbox.load_records()
         changed = dict(records)
-        source = records["verify_colored_object_grasp"]
+        source = records["wait_for_joint_arrival"]
         metadata = deepcopy(source.metadata)
-        metadata["level"]["score"] = records["locate_colored_object_3d"].level
+        metadata["level"]["score"] = records["verify_joint_arrival"].level
         changed[source.name] = toolbox.ToolRecord(source.path, metadata)
         with self.assertRaisesRegex(toolbox.ToolboxError, "dependency level must be lower"):
             toolbox.validate_graph(changed)
 
     def test_missing_score_is_rejected(self) -> None:
-        source = toolbox.load_records()["locate_colored_object_3d"]
+        source = toolbox.load_records()["read_gripper_contract"]
         metadata = deepcopy(source.metadata)
         del metadata["generality"]["score"]
         with tempfile.TemporaryDirectory() as directory:
@@ -61,7 +61,7 @@ class ToolboxTests(unittest.TestCase):
 
     def test_unsupported_runtime_kind_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "locate_colored_object_3d"
+            path = Path(directory) / "read_gripper_contract"
             shutil.copytree(toolbox.TOOLS_DIR / path.name, path)
             yaml_path = path / "tool.yaml"
             yaml_path.write_text(

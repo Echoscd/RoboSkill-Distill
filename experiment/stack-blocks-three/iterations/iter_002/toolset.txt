@@ -1,2 +1,0 @@
-# The installer resolves and records the dependency closure automatically.
-plan_colored_top_down_grasp

@@ -1,4 +1,0 @@
-# Only capabilities whose contracts may apply to a non-color-described stapler.
-read_gripper_contract
-plan_top_down_parallel_grasp
-

@@ -1,0 +1,21 @@
+---
+description: Require reusable Kinex tools to carry scored metadata and obey the toolbox dependency hierarchy
+globs: toolbox/**
+alwaysApply: false
+---
+
+# Kinex toolbox governance
+
+- Put every GPT-formulated tool in `toolbox/tools/<name>`.
+- Add `metadata.json` with integer `generality.score` and `level.score` values
+  from 1 through 10, plus rationale, assumptions, limitations, and provenance.
+- Score the present implementation. Do not score based on the tool name or a
+  future refactor.
+- Prefer small deterministic tools and compose complex behavior from declared
+  lower-level dependencies.
+- A tool may depend only on tools with a strictly lower level score.
+- Preserve measurements, units, frames, confidence, timestamps, and thresholds
+  instead of returning only a boolean.
+- Run `python toolbox/scripts/toolbox.py validate --write-registry` after every
+  toolbox change.
+

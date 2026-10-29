@@ -1,3 +1,0 @@
-list_device_inventory
-read_gripper_contract
-plan_linear_contact

@@ -1,0 +1,4 @@
+{
+  "task_id": "robotwin/click-bell-aloha-agilex",
+  "goal": "Click the bell's top center, keeping the gripper on the bell's side closed."
+}

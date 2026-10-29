@@ -6,7 +6,7 @@
 **/launch-workspace/
 **/native-workspace/
 **/preview/
-robotwin-transfer-10/status.tsv
+.kinex/
 __pycache__/
 *.py[cod]
 *.pid

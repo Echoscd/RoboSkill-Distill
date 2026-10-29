@@ -1,9 +1,14 @@
-# Press stapler iterations
+# Press stapler
 
-`iter_001` repeats the Qwen baseline after the teacher diagnosed semantic grounding
-misuse. It removes color-specific tools from the selected toolset and requires
-calibrated grounding, an explicit IK-checked plan, and a post-contact observation.
+`task.json` contains the model-visible goal. `task.yaml` selects RoboTwin seed 5.
+The task uses the shared prompt and toolbox; no arm, tool sequence or motion
+parameters are prescribed.
 
-Every run uses the online shadow recorder. Failed finalized runs are enqueued for
-the Tool Formulator; successful native runs are not.
+```bash
+bash experiment/press-stapler/run.sh
+```
+
+This wrapper delegates to `experiment/runtime/start-task.sh`. Evidence is written
+under `runs/`; older evidence is preserved in the external cleanup backup.
+See [../README.md](../README.md) for setup, overrides and evaluation semantics.
 

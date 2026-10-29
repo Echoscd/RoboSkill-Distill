@@ -30,7 +30,6 @@ toolbox/
 ├── failurebox/
 │   ├── events/*.json       # failed calls, trace links, diagnosis, and resolution
 │   └── index.json          # generated failure summary
-├── combos/                 # Declarative compositions (added as they mature)
 ├── schemas/                # Machine-readable metadata contracts
 ├── scripts/toolbox.py      # Validate, list, graph, scaffold, and install
 ├── tests/                  # Registry invariants
@@ -39,6 +38,14 @@ toolbox/
 ```
 
 ## Required workflow for a GPT-formulated tool
+
+The active catalog contains the current experiment's dependency closure: device
+inventory, gripper contracts, contact waypoint construction, complete-sequence
+IK selection, reachable contact composition, measured joint arrival, arrival
+polling, and recorded-video inspection. Earlier bottle/color/stacking planners
+and speed-selection trials are recoverable through Git and the external backup
+listed in `experiment/archive-index.json`. Historical failure records remain
+immutable even when the referenced tool version has been retired.
 
 1. Prefer the smallest reusable capability that closes the observed gap.
 2. Run `python toolbox/scripts/toolbox.py new ...` to create the tool skeleton.

@@ -20,14 +20,14 @@ failures. Tool deployment and evaluation are separate later stages.
 
 ```bash
 python3 experiment/tool-formulator/scripts/queue.py enqueue \
-  --run-dir experiment/robotwin-transfer-10/runs/press-stapler/<run> \
-  --experiment robotwin-transfer-10/press-stapler \
+  --run-dir experiment/press-stapler/runs/qwen38_autonomous/<run> \
+  --experiment press-stapler \
   --iteration transfer_eval
 
 python3 experiment/tool-formulator/scripts/queue.py pending --json
 ```
 
-`reproduce-qwen.sh` enqueues a failed finalized run when
+`experiment/runtime/run.sh` enqueues a failed finalized run when
 `KINEX_AUTO_FORMULATE=1`. Successful native runs are never enqueued.
 
 ## Workstation command

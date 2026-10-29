@@ -32,16 +32,16 @@ Run the tests from the repository root:
 python3 -m unittest discover -s experiment/harness/tests -v
 ```
 
-Audit the retained press-stapler run:
+Audit any retained run:
 
 ```bash
 python3 -m experiment.harness.tracing.audit_pi_session \
-  --run-dir experiment/robotwin-transfer-10/runs/press-stapler/<run-id> \
+  --run-dir experiment/press-stapler/runs/qwen38_autonomous/<run-id> \
   --semantic-target stapler \
   --output harness-audit.json
 ```
 
-The audit should report three successful blocking servo calls but no measured
-arrival, no post-contact visual observation, no formal plan contract and a final
-agent claim that conflicts with `native_success=false`.
+The audit normalizes evidence; it does not replace the simulator verdict or
+infer unobserved physical contact. Historical records used by regression tests
+are fixtures, not model context.
 

@@ -1,3 +1,0 @@
-plan_colored_top_down_grasp
-plan_top_down_parallel_place
-plan_place_on_colored_support

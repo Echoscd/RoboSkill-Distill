@@ -1,0 +1,60 @@
+{
+  "schema": "roboskill-distill/cleanup/1",
+  "date": "2026-10-29",
+  "pre_cleanup_commit": "8237330071d89145aa53e5ea46a5ce2b2ce554b8",
+  "external_backup": {
+    "directory": "/LargeModelDev/users/chendong.song/kinex-archive/cleanup-20261029-v1",
+    "snapshot": "experiment-toolbox-before.tar.gz",
+    "sha256": "b5bbbf46ebe2c8d61143e0250ba470f560251acaaa3066d860826b7789fa3972",
+    "git_bundle": "code-before.bundle",
+    "access": "private developer-machine archive; credentials and raw media are never published"
+  },
+  "retired_experiments": [
+    "experiment/adjust-bottle",
+    "experiment/stack-blocks-three",
+    "experiment/robotwin-transfer-10",
+    "experiment/press-stapler/iterations",
+    "experiment/press-stapler/seed-eval",
+    "experiment/press-stapler/scripts",
+    "experiment/press-stapler/video-diagnosis"
+  ],
+  "retired_tools": [
+    "estimate_colored_object_geometry_3d",
+    "locate_colored_object_3d",
+    "plan_colored_bottle_grasp",
+    "plan_colored_top_down_grasp",
+    "plan_held_bottle_transfer",
+    "plan_linear_contact",
+    "plan_place_on_colored_support",
+    "plan_top_down_parallel_grasp",
+    "plan_top_down_parallel_place",
+    "select_servo_speed",
+    "verify_colored_object_grasp"
+  ],
+  "retired_local_state": [
+    "env/baselines",
+    "env/iterations",
+    "env/workspaces",
+    "env/downloads",
+    "env/tmp",
+    "experiment/.kinex",
+    "experiment/device-check/runs",
+    "experiment/device-check/preflight",
+    "experiment/harness/runs",
+    "experiment/press-stapler/runs except latest native-compat run"
+  ],
+  "retained_reference_run": "experiment/press-stapler/runs/qwen38_autonomous/20261029T080404Z_native_compat_retry_seed5",
+  "local_state_recovery": "Original run content is moved unchanged under external_backup.directory/residue or retired-state; the pre-cleanup experiment/toolbox snapshot is also retained.",
+  "relocations": {
+    "experiment/stack-blocks-three/scripts": "experiment/runtime",
+    "experiment/press-stapler/scripts/run-qwen38-autonomous.sh": "experiment/press-stapler/run.sh",
+    "experiment/press-stapler/iterations/qwen38_autonomous/task.json": "experiment/press-stapler/task.json",
+    "experiment/press-stapler/iterations/qwen38_autonomous/toolset.txt": "experiment/toolset.txt",
+    "experiment/press-stapler/iterations/qwen38_autonomous/research-review.json": "experiment/protocols/research-review.json",
+    "experiment/press-stapler/seed-eval/generated-tasks/press-stapler-seed5.yaml": "experiment/press-stapler/task.yaml"
+  },
+  "evidence_policy": "Retain every original trace, frame, video and failure record. Historical paths in immutable records refer to this snapshot or the retained pre-cleanup Git commit.",
+  "active_tool_policy": "Keep exactly the shared toolset dependency closure; retirements do not assert that earlier tools have no scientific value.",
+  "cleanup_changes_behavior": false,
+  "behavior_note": "Existing active tool implementations and the shared agent instruction are unchanged. Launch infrastructure is relocated and task configuration is separated; validate before interpreting transfer results."
+}

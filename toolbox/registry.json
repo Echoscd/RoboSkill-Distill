@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tool_count": 19,
+  "tool_count": 8,
   "tools": [
     {
       "name": "list_device_inventory",
@@ -83,39 +83,6 @@
       "change_log": "tools/build_linear_contact_waypoints/changes.jsonl"
     },
     {
-      "name": "select_servo_speed",
-      "version": "0.1.1",
-      "status": "experimental",
-      "tool_type": "atomic",
-      "generality": 10,
-      "level": 3,
-      "dependencies": [],
-      "summary": "Select the slowest Servo speed that fits an explicit trajectory-duration budget.",
-      "tested_tasks": [
-        "robotwin/press-stapler-aloha-agilex (harness_v2_iter_005 exposed world-time versus wall-time distinction)"
-      ],
-      "interface": "tools/select_servo_speed/tool.yaml",
-      "toolbook": "tools/select_servo_speed/toolbook.yaml",
-      "change_log": "tools/select_servo_speed/changes.jsonl"
-    },
-    {
-      "name": "locate_colored_object_3d",
-      "version": "0.1.0",
-      "status": "validated",
-      "tool_type": "composite",
-      "generality": 6,
-      "level": 4,
-      "dependencies": [],
-      "summary": "Locate a dominant-color object in calibrated RGB-D and estimate its visible three-dimensional geometry.",
-      "tested_tasks": [
-        "robotwin/adjust-bottle-aloha-agilex",
-        "robotwin/stack-blocks-three-aloha-agilex"
-      ],
-      "interface": "tools/locate_colored_object_3d/tool.yaml",
-      "toolbook": "tools/locate_colored_object_3d/toolbook.yaml",
-      "change_log": "tools/locate_colored_object_3d/changes.jsonl"
-    },
-    {
       "name": "wait_for_joint_arrival",
       "version": "0.1.0",
       "status": "experimental",
@@ -134,24 +101,6 @@
       "change_log": "tools/wait_for_joint_arrival/changes.jsonl"
     },
     {
-      "name": "estimate_colored_object_geometry_3d",
-      "version": "0.1.0",
-      "status": "experimental",
-      "tool_type": "composite",
-      "generality": 6,
-      "level": 5,
-      "dependencies": [
-        "locate_colored_object_3d"
-      ],
-      "summary": "Estimate support-relative center, height, footprint axes, and extents for a dominant-color tabletop object from calibrated RGB-D.",
-      "tested_tasks": [
-        "robotwin/stack-blocks-three-aloha-agilex"
-      ],
-      "interface": "tools/estimate_colored_object_geometry_3d/tool.yaml",
-      "toolbook": "tools/estimate_colored_object_geometry_3d/toolbook.yaml",
-      "change_log": "tools/estimate_colored_object_geometry_3d/changes.jsonl"
-    },
-    {
       "name": "solve_reachable_pose_sequence",
       "version": "0.1.0",
       "status": "experimental",
@@ -166,111 +115,6 @@
       "interface": "tools/solve_reachable_pose_sequence/tool.yaml",
       "toolbook": "tools/solve_reachable_pose_sequence/toolbook.yaml",
       "change_log": "tools/solve_reachable_pose_sequence/changes.jsonl"
-    },
-    {
-      "name": "plan_held_bottle_transfer",
-      "version": "0.1.0",
-      "status": "validated",
-      "tool_type": "composite",
-      "generality": 4,
-      "level": 6,
-      "dependencies": [],
-      "summary": "Generate IK-checked lift and transfer targets for a bottle already held by a parallel-jaw gripper.",
-      "tested_tasks": [
-        "robotwin/adjust-bottle-aloha-agilex"
-      ],
-      "interface": "tools/plan_held_bottle_transfer/tool.yaml",
-      "toolbook": "tools/plan_held_bottle_transfer/toolbook.yaml",
-      "change_log": "tools/plan_held_bottle_transfer/changes.jsonl"
-    },
-    {
-      "name": "plan_linear_contact",
-      "version": "0.2.0",
-      "status": "experimental",
-      "tool_type": "composite",
-      "generality": 8,
-      "level": 6,
-      "dependencies": [],
-      "summary": "Generate an observation-grounded, TCP-compensated and IK-checked linear contact plan from an explicit surface outward normal.",
-      "tested_tasks": [
-        "robotwin/press-stapler-aloha-agilex (iter_007: native_success)"
-      ],
-      "interface": "tools/plan_linear_contact/tool.yaml",
-      "toolbook": "tools/plan_linear_contact/toolbook.yaml",
-      "change_log": "tools/plan_linear_contact/changes.jsonl"
-    },
-    {
-      "name": "plan_top_down_parallel_grasp",
-      "version": "0.1.0",
-      "status": "experimental",
-      "tool_type": "composite",
-      "generality": 8,
-      "level": 6,
-      "dependencies": [
-        "read_gripper_contract"
-      ],
-      "summary": "Generate profile-aware, TCP-compensated, IK-checked top-down parallel-jaw grasp stages from explicit object geometry.",
-      "tested_tasks": [
-        "robotwin/stack-blocks-three-aloha-agilex"
-      ],
-      "interface": "tools/plan_top_down_parallel_grasp/tool.yaml",
-      "toolbook": "tools/plan_top_down_parallel_grasp/toolbook.yaml",
-      "change_log": "tools/plan_top_down_parallel_grasp/changes.jsonl"
-    },
-    {
-      "name": "verify_colored_object_grasp",
-      "version": "0.1.0",
-      "status": "validated",
-      "tool_type": "composite",
-      "generality": 5,
-      "level": 6,
-      "dependencies": [
-        "locate_colored_object_3d"
-      ],
-      "summary": "Verify a parallel-jaw test lift of a color-grounded rigid object using independent visual and gripper evidence.",
-      "tested_tasks": [
-        "robotwin/adjust-bottle-aloha-agilex"
-      ],
-      "interface": "tools/verify_colored_object_grasp/tool.yaml",
-      "toolbook": "tools/verify_colored_object_grasp/toolbook.yaml",
-      "change_log": "tools/verify_colored_object_grasp/changes.jsonl"
-    },
-    {
-      "name": "plan_colored_bottle_grasp",
-      "version": "0.1.0",
-      "status": "validated",
-      "tool_type": "composite",
-      "generality": 3,
-      "level": 7,
-      "dependencies": [
-        "locate_colored_object_3d"
-      ],
-      "summary": "Generate an IK-checked top-down grasp sequence for a color-described bottle lying on a support surface.",
-      "tested_tasks": [
-        "robotwin/adjust-bottle-aloha-agilex"
-      ],
-      "interface": "tools/plan_colored_bottle_grasp/tool.yaml",
-      "toolbook": "tools/plan_colored_bottle_grasp/toolbook.yaml",
-      "change_log": "tools/plan_colored_bottle_grasp/changes.jsonl"
-    },
-    {
-      "name": "plan_colored_top_down_grasp",
-      "version": "0.1.0",
-      "status": "experimental",
-      "tool_type": "composite",
-      "generality": 6,
-      "level": 7,
-      "dependencies": [
-        "estimate_colored_object_geometry_3d",
-        "plan_top_down_parallel_grasp"
-      ],
-      "summary": "Compose colored-object geometry, gripper contracts, TCP compensation, and chained IK into an executable top-down grasp plan.",
-      "tested_tasks": [
-        "robotwin/stack-blocks-three-aloha-agilex"
-      ],
-      "interface": "tools/plan_colored_top_down_grasp/tool.yaml",
-      "toolbook": "tools/plan_colored_top_down_grasp/toolbook.yaml",
-      "change_log": "tools/plan_colored_top_down_grasp/changes.jsonl"
     },
     {
       "name": "plan_reachable_linear_contact",
@@ -290,43 +134,6 @@
       "interface": "tools/plan_reachable_linear_contact/tool.yaml",
       "toolbook": "tools/plan_reachable_linear_contact/toolbook.yaml",
       "change_log": "tools/plan_reachable_linear_contact/changes.jsonl"
-    },
-    {
-      "name": "plan_top_down_parallel_place",
-      "version": "0.2.0",
-      "status": "experimental",
-      "tool_type": "composite",
-      "generality": 8,
-      "level": 7,
-      "dependencies": [
-        "plan_top_down_parallel_grasp"
-      ],
-      "summary": "Generate profile-aware, chained-IK top-down placement stages with bounded wrist-yaw search for an explicit world-frame object-center target.",
-      "tested_tasks": [
-        "robotwin/stack-blocks-three-aloha-agilex"
-      ],
-      "interface": "tools/plan_top_down_parallel_place/tool.yaml",
-      "toolbook": "tools/plan_top_down_parallel_place/toolbook.yaml",
-      "change_log": "tools/plan_top_down_parallel_place/changes.jsonl"
-    },
-    {
-      "name": "plan_place_on_colored_support",
-      "version": "0.1.0",
-      "status": "experimental",
-      "tool_type": "composite",
-      "generality": 6,
-      "level": 8,
-      "dependencies": [
-        "estimate_colored_object_geometry_3d",
-        "plan_top_down_parallel_place"
-      ],
-      "summary": "Compose colored support geometry and TCP-preserving placement planning into IK-checked stacking stages for an already-held object.",
-      "tested_tasks": [
-        "robotwin/stack-blocks-three-aloha-agilex"
-      ],
-      "interface": "tools/plan_place_on_colored_support/tool.yaml",
-      "toolbook": "tools/plan_place_on_colored_support/toolbook.yaml",
-      "change_log": "tools/plan_place_on_colored_support/changes.jsonl"
     }
   ]
 }

@@ -1,5 +1,0 @@
-# Reusable tools required by the successful adjust-bottle experiment.
-locate_colored_object_3d
-plan_colored_bottle_grasp
-verify_colored_object_grasp
-plan_held_bottle_transfer

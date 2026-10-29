@@ -1,3 +1,23 @@
+# RoboSkill-Distill
+
+Kinex + RoboTwin experiments for studying VLM manipulation and GPT-formulated
+tools. Current code uses a shared task-independent prompt, observe-only tracing,
+native simulator evaluation and video-first failure diagnosis.
+
+- [Experiment setup, entry points and evidence](experiment/README.md)
+- [Active toolbox and tool-authoring contract](toolbox/README.md)
+- [Live monitor](experiment/monitor/README.md)
+- [Pinned dependency patches](experiment/dependency-patches/versions.json)
+
+Start with `bash experiment/runtime/start-task.sh experiment/press-stapler`.
+Environments, credentials and generated recordings stay outside Git.
+Historical attempts are recoverable through Git and the external backup listed
+in [the archive index](experiment/archive-index.json).
+
+The upstream Kinex source, usage guide below, licenses and attribution are retained.
+
+---
+
 <p align="center">
   <img src="assets/kinex-logo-text-day.svg#gh-light-mode-only" alt="Kinex" height="100">
   <img src="assets/kinex-logo-text-night.svg#gh-dark-mode-only" alt="Kinex" height="100">

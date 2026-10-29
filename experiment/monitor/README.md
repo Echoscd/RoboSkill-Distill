@@ -18,7 +18,7 @@ cd /LargeModelDev/users/chendong.song/kinex
 ./experiment/monitor/start.sh
 ```
 
-默认监听 `127.0.0.1:8765`，并自动跟随 `env/iterations` 中最新的 `events.jsonl` 和 RoboEnv `run.json`。
+默认监听 `127.0.0.1:8765`，并自动跟随 `experiment/` 中最新的 `events.jsonl` 和 RoboEnv `run.json`。
 
 在本机建立 SSH 隧道：
 

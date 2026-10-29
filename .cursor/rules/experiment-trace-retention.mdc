@@ -1,0 +1,21 @@
+---
+description: Require every Kinex experiment attempt to retain raw inference traces and an offline HTML report
+globs: experiment/**/*
+alwaysApply: false
+---
+
+# Experiment trace retention
+
+- Treat success, failure, timeout and launch error as equally recordable runs.
+- Write every run under `experiment/<name>/runs/<run-id>`; never put generated
+  experiment state in `env/`.
+- Preserve `agent/events.jsonl`, `agent/session.jsonl` when available, prompt,
+  stderr, RoboEnv run metadata, native evidence and stop status.
+- Call `experiment/lib/finalize_run.py` from an `EXIT` trap after stopping the
+  simulator. Do not make HTML generation conditional on `native_success`.
+- Every run must contain `trace-manifest.json`, `trace.html` and
+  `trace-render.log`. A renderer failure must produce a fallback HTML and must
+  not delete or rewrite raw traces.
+- Use RoboTwin `native_success`, not the model's prose, as the success label.
+- Keep observable model inputs/outputs and tool calls/results in the report;
+  raw JSONL remains the authoritative record.

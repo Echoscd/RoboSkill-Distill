@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
-EXPERIMENT_SCRIPTS="$REPO_ROOT/experiment/stack-blocks-three/scripts"
+EXPERIMENT_SCRIPTS="$REPO_ROOT/experiment/runtime"
 RUN_ROOT="${KINEX_SMOKE_RUNS:-$REPO_ROOT/experiment/harness/runs/online-smoke}"
 RUN_DIR="${1:-$RUN_ROOT/$(date -u +%Y%m%dT%H%M%SZ)_press-stapler_camera-read}"
 
@@ -22,16 +22,16 @@ mkdir -p "$RUN_DIR"
 RUN_JSON=""
 cleanup() {
   if [[ -n "$RUN_JSON" && -f "$RUN_JSON" ]]; then
-    "$EXPERIMENT_SCRIPTS/stop-roboenv.sh" "$RUN_JSON" >"$RUN_DIR/stop.json" 2>"$RUN_DIR/stop.stderr.log" || true
+    bash "$EXPERIMENT_SCRIPTS/stop-simulator.sh" "$RUN_JSON" >"$RUN_DIR/stop.json" 2>"$RUN_DIR/stop.stderr.log" || true
   fi
 }
 trap cleanup EXIT INT TERM
 
-"$EXPERIMENT_SCRIPTS/launch-roboenv.sh" "$RUN_DIR"
+bash "$EXPERIMENT_SCRIPTS/launch-simulator.sh" "$RUN_DIR"
 RUN_JSON="$(<"$RUN_DIR/roboenv-run.path")"
 
 set +e
-"$EXPERIMENT_SCRIPTS/run-qwen.sh" "$RUN_JSON" "$RUN_DIR"
+bash "$EXPERIMENT_SCRIPTS/run-model.sh" "$RUN_JSON" "$RUN_DIR"
 AGENT_STATUS=$?
 set -e
 

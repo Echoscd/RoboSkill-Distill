@@ -1,3 +1,0 @@
-# Cross-task reuse test. No task-specific grasp or stacking planner is exposed.
-locate_colored_object_3d
-
