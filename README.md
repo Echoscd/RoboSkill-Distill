@@ -1,20 +1,203 @@
 # RoboSkill-Distill
 
-Kinex + RoboTwin experiments for studying VLM manipulation and GPT-formulated
-tools. Current code uses a shared task-independent prompt, observe-only tracing,
-native simulator evaluation and video-first failure diagnosis.
+This research fork combines **Kinex + RoboTwin** to study VLM manipulation and
+reusable tools formulated from failed attempts. The model chooses its own actions;
+the harness records evidence, submits the native evaluator, and supports video-first
+failure analysis. The toolbox is inherited experimental knowledge, not a no-tool
+baseline or a guarantee of task success.
 
-- [Experiment setup, entry points and evidence](experiment/README.md)
-- [Active toolbox and tool-authoring contract](toolbox/README.md)
-- [Live monitor](experiment/monitor/README.md)
-- [Pinned dependency patches](experiment/dependency-patches/versions.json)
+**Start here for this fork.** The upstream Kinex guide is retained below for
+reference. Its installer downloads upstream Kinex; it does not install this fork's
+experiment harness or prepare RoboTwin.
 
-Start with `bash experiment/runtime/start-task.sh experiment/press-stapler`.
-Environments, credentials and generated recordings stay outside Git.
-Historical attempts are recoverable through Git and the external backup listed
-in [the archive index](experiment/archive-index.json).
+## Repository guide
 
-The upstream Kinex source, usage guide below, licenses and attribution are retained.
+- [`experiment/`](experiment/README.md): task definitions, shared launchers and evidence pipeline.
+- [`toolbox/`](toolbox/README.md): active tools, concise interfaces, detailed manuals and provenance.
+- [`experiment/prompts/robot_agent.txt`](experiment/prompts/robot_agent.txt): shared task-independent agent instruction.
+- [`experiment/toolset.txt`](experiment/toolset.txt): custom tools exposed to the agent; dependencies are installed automatically.
+- [`experiment/harness/`](experiment/harness/README.md): online records and offline audits; the recorder is observe-only.
+- [`experiment/monitor/`](experiment/monitor/README.md): read-only live scene and tool-call dashboard.
+- [`experiment/dependency-patches/`](experiment/dependency-patches/versions.json): pinned RoboEnv/RoboTwin revisions and patches.
+- `packages/` and `src/`: upstream Kinex core, setup and standalone agent.
+- `env/`: ignored local installations, caches, weights, configuration and secrets. Keep experiment source outside it.
+
+Historical attempts are indexed in [`experiment/archive-index.json`](experiment/archive-index.json).
+The external backup referenced there is not distributed with this repository.
+
+## First check: no API or simulator required
+
+Use Linux with Bash for the experiment scripts. Python 3 is sufficient for this
+prompt-rendering check; full experiments additionally need Node.js >=22.19,
+uv-managed Kinex Python >=3.11, FFmpeg and a working RoboTwin rendering environment.
+
+```bash
+git clone --branch kinex-experiments-20261029 https://github.com/Echoscd/RoboSkill-Distill.git
+cd RoboSkill-Distill
+KINEX_DRY_RUN=1 bash experiment/runtime/start-task.sh experiment/press-stapler
+```
+
+This creates an ignored run directory with `input-prompt.txt` and
+`prompt-provenance.json`. It checks prompt rendering only; it does not validate
+devices, credentials, IK, rendering or model availability.
+
+## Prepare a machine before running an experiment
+
+There is currently **no complete fresh-machine bootstrap script**. The launchers
+assume the following local deployment exists:
+
+```text
+env/
+  source/                       # built Kinex source matching this fork's revision
+  RoboEnv/                      # pinned checkout, prepared RoboTwin and assets
+  node/current/bin/             # Node runtime, or a compatible Node on PATH
+  workspace/.kinex/             # workspace.yaml, exported devices and runtime Python
+  config/agent/models.json      # local provider/model configuration
+  config/kinex-env-proxy.cjs     # Node proxy preload used by the online launcher
+  bin/kinex-via-pc               # local Kinex executable/wrapper
+  secrets/openrouter_api_key     # key only; never commit it
+```
+
+1. Prepare RoboEnv/RoboTwin at the revisions in
+   [`versions.json`](experiment/dependency-patches/versions.json). Apply each patch
+   to its corresponding checkout with `git apply --check` before `git apply`.
+   Install dependencies and download simulator assets separately; they are not in Git.
+2. Build the Kinex source used by the launcher (`npm ci`, then `npm run build` in
+   that source checkout). Keep it synchronized with the research fork. Editing this
+   repository does not automatically update a separate `env/source` installation.
+3. Export the ALOHA AgileX device profiles into `env/workspace` using the
+   [upstream simulator setup](#use-kinex-with-simulators), and prepare its runtime Python.
+4. Configure a model provider and put its key in the local key file. The default
+   model identifier is `openrouter/qwen/qwen3.8-max-0902`; check that your provider
+   actually offers it, or set `KINEX_EXPERIMENT_MODEL` to an available model.
+5. Review [`common.sh`](experiment/runtime/common.sh) and
+   [`run-agent.sh`](experiment/harness/online/run-agent.sh) before launch. Some
+   defaults are specific to the original development machine. Set `ROBOTWIN_PYTHON`
+   to your interpreter and `KINEX_PC_PROXY_URL` to your reachable HTTP proxy.
+   The current online launcher requires the local proxy preload shown above;
+   proxy-free deployment needs launcher/preload adaptation.
+
+`KINEX_ENV_ROOT`, `KINEX_BASE_WORKSPACE`, `KINEX_BIN`, `OPENROUTER_KEY_FILE`,
+`ROBOENV_ROOT` and `ROBOENV_PYTHON_PATH` customize single-task deployment paths.
+The suite runner currently discovers its catalog under **repository-local
+`env/RoboEnv`**, so moving only `KINEX_ENV_ROOT` does not relocate that catalog.
+
+Neither environments nor provider configuration, credentials, model weights or
+generated recordings are included in this repository. Keep sensitive files local;
+inspect traces and configuration before sharing an evidence directory.
+
+## Run one task on a prepared machine
+
+From the repository root:
+
+```bash
+export ROBOTWIN_PYTHON=/absolute/path/to/robotwin/bin/python
+export KINEX_PC_PROXY_URL=http://127.0.0.1:18080  # replace with your working proxy
+
+bash experiment/runtime/start-task.sh experiment/press-stapler
+# Other task definitions use the same launcher:
+# bash experiment/runtime/start-task.sh experiment/click-bell
+# bash experiment/runtime/start-task.sh experiment/turn-switch
+```
+
+By default, evidence is written to
+`experiment/<task>/runs/autonomous/<UTC_TIMESTAMP>/`. To select an output location,
+pass a second argument using a **new, unused directory**:
+
+```bash
+bash experiment/runtime/start-task.sh experiment/turn-switch \
+  experiment/turn-switch/runs/autonomous/my_unique_attempt
+```
+
+The action phase defaults to 600 seconds and failure diagnosis to 360 seconds;
+initialization and finalization add time. Override them with
+`KINEX_EXPERIMENT_TIMEOUT_S` and `KINEX_FAILURE_ANALYSIS_TIMEOUT_S`.
+
+The flow is: render the common prompt with the task goal, deploy tools, start and
+record the simulator, run the model, submit the native evaluator, attempt read-only
+video diagnosis on failure, then finalize evidence and HTML. Diagnosis may itself
+fail or time out; check its logs rather than assuming a diagnosis was produced.
+
+Task folders separate the model's goal (`task.json`) from evaluator-side scene,
+seed and budget (`task.yaml`). For another task, keep these definitions consistent
+and reuse the shared launcher. Do not insert a prescribed action sequence or old
+iteration history into the shared prompt.
+
+## Inspect a run
+
+Open `<RUN_DIR>/trace.html` for offline review. Important evidence files are:
+
+- `agent/primary-session.jsonl`: recorded action-phase model messages and tool I/O.
+- `agent/events.jsonl` and `harness-events.jsonl`: model stream and online device/tool records.
+- `agent/failure-analysis-session.jsonl`: separate diagnosis session, when created.
+- `simulator-verdict.json`: supervisor-submitted native evaluator result.
+- `trace-manifest.json` and `harness-audit.json`: artifact inventory and evidence audit, when available.
+- `roboenv/<session>/evidence/recording/`: simulator videos and frame metadata, when recording started.
+- `agent/run-state.txt`, `agent/stderr.log` and launch logs: process state and runtime failures.
+
+Finalization is attempted on success, failure and timeout. If startup fails before
+a model session or recording exists, HTML can be a fallback report; missing
+evidence must remain explicit. See [`experiment/lib/README.md`](experiment/lib/README.md).
+
+For live supervision, run `bash experiment/monitor/start.sh` on the development
+machine. It listens on `127.0.0.1:8765` by default. From your workstation, forward
+that port with `ssh -N -L 8765:127.0.0.1:8765 YOUR_SSH_HOST`, then open
+<http://127.0.0.1:8765>. Keep the monitor on loopback; it exposes experiment data.
+
+## Run the installed RoboTwin catalog
+
+After the same environment is prepared:
+
+```bash
+"$ROBOTWIN_PYTHON" experiment/benchmark/run_suite.py \
+  --batch-dir experiment/benchmark/runs/my_unique_batch --seed 0
+```
+
+This selects the installed ALOHA AgileX catalog, runs serially with `demo_clean`
+and no seed substitution, and saves a full attempt per task. Inspect
+`suite-state.json` for progress, `suite-results.json` for results and
+`suite-manifest.json` for configuration and source hashes.
+
+Do not run another task launcher against the same shared device profiles while a
+suite is active. The suite lock prevents a second suite driver, not independent
+single-task launches. Do not edit fingerprinted runtime, prompt or tool files
+mid-batch: the next task will stop with `source_changed`. Use a new batch after
+changes. A `STOP_AFTER_CURRENT` file inside the batch directory stops the queue
+after the active task. Resume skips completed jobs and preserves incomplete
+attempts rather than overwriting them.
+
+## Interpret results and current limitations
+
+- **Native result, agent claim and process exit are separate facts.** A model
+  claiming success does not establish task success. A timeout can occur after
+  native success; conversely, a clean process exit can leave the task unfinished.
+- Separate simulator startup errors and provider/API interruptions from completed
+  manipulation attempts. Do not treat every `native_success=false` as the same
+  model capability failure.
+- This suite is a single-seed coverage pass under
+  `absolute_joint_position_25hz_practice`, **not an official multi-seed RoboTwin score**.
+- IK feasibility does not establish collision clearance. Without a collision
+  context, planning explicitly returns `collision_validation.status=unverified`.
+  The model may choose to skip these optional tools; inspect actual calls.
+- Scene maps cover observed surfaces. Current collision checks are sampled and
+  conservative, with incomplete gripper geometry and no continuous or simultaneous
+  dual-arm safety guarantee. TCP-origin contact is not calibrated finger-pad contact.
+- Blocking motion/world waits have timed out in current runs. Submission,
+  completion and measured arrival need separate inspection; timeout alone does not
+  identify a collision or prove no motion occurred.
+- The stapler's current native criterion checks contact with a static actor; it
+  does not demonstrate full physical compression.
+
+For new tools, follow [`toolbox/README.md`](toolbox/README.md): keep the runtime
+`tool.yaml` concise, put detailed parameter semantics/examples in `toolbook.yaml`,
+record generality and complexity in `metadata.json`, and retain failure records,
+tests and append-only `changes.jsonl` history. High-level tools compose lower-level
+capabilities. Keep research notes and diagnosis out of the task-independent prompt.
+
+## Upstream Kinex reference
+
+The original usage guide, licenses and attribution follow. For the research
+pipeline above, use the fork's checked-out source and launchers.
 
 ---
 
