@@ -1,0 +1,8 @@
+{
+  "schema": "roboskill-distill/dependency-snapshot/1",
+  "date": "2026-10-29",
+  "kinex_base": {"repository": "https://github.com/stacx-lab/kinex.git", "commit": "15207927c6669fe98f1213a3fd05148e0fe938d3"},
+  "roboenv": {"repository": "https://github.com/stacx-lab/RoboEnv.git", "commit": "c071a25b6866d3843459ebfd4453dc300243cdc6", "patch": "roboenv.patch"},
+  "robotwin": {"location": "RoboEnv/third_party/RoboTwin", "commit": "ea8b21121ebb3cd201ff5b3fe361944ac94eda3f", "patch": "robotwin.patch"},
+  "apply": ["Check out each pinned dependency before applying its patch with git apply --check, then git apply.", "Runtime installations and weights are not included. Untracked local data and unrelated task-generation files are excluded."]
+}

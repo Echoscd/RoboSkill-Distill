@@ -1,0 +1,91 @@
+schema_version: 1
+name: verify_colored_object_grasp
+version: 0.1.0
+summary: >-
+  Verify a parallel-jaw test lift of a color-grounded rigid object using independent visual and gripper evidence.
+usage:
+  when_to_use:
+    - Use when the current task and observation satisfy every field in tool.yaml.
+  when_not_to_use:
+    - Do not guess missing devices, frames, calibration, geometry, or measurements.
+  prerequisites:
+    - Read the concise contract in tool.yaml before constructing arguments.
+  examples: []
+parameters:
+  camera:
+    meaning: Camera used for post-lift visual evidence.
+    format: Loaded calibrated RGB-D device ID string.
+    unit: null
+    frame: null
+    source: Device inventory.
+    constraints: [Must observe the object after test lift.]
+    do_not: [Do not reuse the pre-grasp frame.]
+  arm:
+    meaning: Arm carrying the gripper.
+    format: Loaded joint device ID string.
+    unit: null
+    frame: null
+    source: Device inventory.
+    constraints: [Live TCP pose must be readable.]
+    do_not: [Do not use planned pose as measured feedback.]
+  gripper:
+    meaning: Gripper whose aperture supplies independent evidence.
+    format: Loaded gripper device ID string.
+    unit: null
+    frame: null
+    source: Device inventory.
+    constraints: [Live aperture must be readable.]
+    do_not: [Do not use commanded close value as measured aperture.]
+  color:
+    meaning: Dominant visible object color.
+    format: Supported color enum.
+    unit: null
+    frame: null
+    source: Task grounding and current observation.
+    constraints: [Must identify the same object as the initial geometry.]
+    do_not: [Do not silently switch to another same-color component.]
+  initial_center_world_m:
+    meaning: Pre-grasp object center used as displacement baseline.
+    format: Three finite numbers ordered [x, y, z].
+    unit: m
+    frame: world
+    source: The grasp plan's source observation.
+    constraints: [Must refer to the same object and frame as the post-lift observation.]
+    do_not: [Do not replace with TCP position.]
+  object_diameter_m:
+    meaning: Estimated cross-section used for gripper and proximity thresholds.
+    format: Number in [0.02, 0.12].
+    unit: m
+    frame: object geometry
+    source: The preceding bottle grasp plan.
+    constraints: [Must refer to the same held object.]
+    do_not: [Do not substitute axis length.]
+  initial_axis_length_m:
+    meaning: Full pre-grasp long-axis length used to reject partial or wrong detections.
+    format: Number in [0.05, 0.50].
+    unit: m
+    frame: object geometry
+    source: The preceding bottle grasp plan.
+    constraints: [Must use full length.]
+    do_not: [Do not use image-pixel length.]
+  minimum_lift_m:
+    meaning: Minimum upward object displacement required as visual lift evidence.
+    format: Number in [0.01, 0.12].
+    unit: m
+    frame: world vertical
+    source: Verification policy.
+    constraints: [Must exceed expected perception noise.]
+    do_not: [Do not set below positional uncertainty.]
+returns:
+  summary: Raw visual, TCP, and aperture measurements; individual predicates and thresholds; and the combined grasp_verified verdict.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py]
+  known_failures: []
+  recovery:
+    - Re-read the parameter descriptions and verify device IDs, units, and coordinate frames.
+    - If the contract is satisfied but the call still fails, inspect the entrypoint and implementation source.
+    - Record the failed call in failurebox before changing the tool.
+source:
+  entrypoint: tool.py
+  implementation: []
+  tests: []

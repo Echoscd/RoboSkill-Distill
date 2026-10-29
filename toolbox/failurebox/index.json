@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "failure_count": 8,
+  "failures": [
+    {
+      "failure_id": "failure_20261029034339_fa753bac3b03632e",
+      "occurred_at": "2026-10-29T03:43:39.944Z",
+      "tool": "plan_linear_contact",
+      "code": "PyToolError",
+      "stage": "runtime",
+      "diagnosis_status": "unreviewed",
+      "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029034935_cc58701bf62a4806",
+      "occurred_at": "2026-10-29T03:49:35.585Z",
+      "tool": "plan_linear_contact",
+      "code": "PyToolError",
+      "stage": "runtime",
+      "diagnosis_status": "unreviewed",
+      "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029040127_822f054ff5580aab",
+      "occurred_at": "2026-10-29T04:01:27.358Z",
+      "tool": "plan_reachable_linear_contact",
+      "code": "PyToolError",
+      "stage": "runtime",
+      "diagnosis_status": "unreviewed",
+      "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029040249_6edf323e70459db7",
+      "occurred_at": "2026-10-29T04:02:49.677Z",
+      "tool": "plan_reachable_linear_contact",
+      "code": "PyToolError",
+      "stage": "runtime",
+      "diagnosis_status": "unreviewed",
+      "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029042314_e41be068e065ef5e",
+      "occurred_at": "2026-10-29T04:23:14.584Z",
+      "tool": "servo",
+      "code": "PyToolError",
+      "stage": "runtime",
+      "diagnosis_status": "unreviewed",
+      "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029042435_3ceef0331bbf2137",
+      "occurred_at": "2026-10-29T04:24:35.709Z",
+      "tool": "servo",
+      "code": "PyToolError",
+      "stage": "runtime",
+      "diagnosis_status": "unreviewed",
+      "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029043705_7bb79c817a333bf6",
+      "occurred_at": "2026-10-29T04:37:05.897Z",
+      "tool": "servo",
+      "code": "PyToolError",
+      "stage": "runtime",
+      "diagnosis_status": "unreviewed",
+      "resolution_status": "open"
+    },
+    {
+      "failure_id": "failure_20261029_tcp_contact_feature",
+      "occurred_at": "2026-10-29T14:50:28+08:00",
+      "tool": "plan_reachable_linear_contact",
+      "code": "UNMODELED_PHYSICAL_CONTACT_FEATURE",
+      "stage": "verification",
+      "diagnosis_status": "reviewed",
+      "resolution_status": "open"
+    }
+  ]
+}

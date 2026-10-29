@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kinex.local/schemas/tool-metadata.schema.json",
+  "title": "Kinex toolbox metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "name",
+    "version",
+    "status",
+    "formulated_by",
+    "created_at",
+    "updated_at",
+    "summary",
+    "tool_type",
+    "generality",
+    "level",
+    "composition",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["draft", "experimental", "validated", "deprecated"]},
+    "formulated_by": {"enum": ["gpt", "human", "joint"]},
+    "created_at": {"type": "string", "format": "date"},
+    "updated_at": {"type": "string", "format": "date"},
+    "summary": {"type": "string", "minLength": 12},
+    "tool_type": {"enum": ["atomic", "composite"]},
+    "domains": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "generality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "rationale", "assumptions", "limitations", "tested_tasks"],
+      "properties": {
+        "score": {"type": "integer", "minimum": 1, "maximum": 10},
+        "rationale": {"type": "string", "minLength": 12},
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}},
+        "tested_tasks": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "rationale"],
+      "properties": {
+        "score": {"type": "integer", "minimum": 1, "maximum": 10},
+        "rationale": {"type": "string", "minLength": 12}
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dependencies", "strategy"],
+      "properties": {
+        "dependencies": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "uniqueItems": true
+        },
+        "strategy": {"type": "string"}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["experiment", "iteration", "failure_gap", "evidence"],
+      "properties": {
+        "experiment": {"type": "string"},
+        "iteration": {"type": "string"},
+        "failure_gap": {"type": "string"},
+        "evidence": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}
+

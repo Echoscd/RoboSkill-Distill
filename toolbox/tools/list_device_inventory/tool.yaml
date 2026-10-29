@@ -1,0 +1,24 @@
+name: list_device_inventory
+version: 0.1.0
+title: List Device Inventory
+kind: perception
+description: >-
+  Return a bounded inventory of all registered Kinex devices with their device ID,
+  type, activation intent, driver actions, and connection kind. Call this before
+  selecting a camera, detector, arm, gripper, world, or other device. It avoids
+  recursive filesystem discovery and does not load, unload, command, or read a device.
+parameters:
+  type: object
+  additionalProperties: false
+  properties: {}
+  examples:
+    - {}
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 10
+

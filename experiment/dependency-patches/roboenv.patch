@@ -1,0 +1,39 @@
+diff --git a/runtime/src/roboenv_runtime/runtime/atomic.py b/runtime/src/roboenv_runtime/runtime/atomic.py
+index 90afabb..afc64d9 100644
+--- a/runtime/src/roboenv_runtime/runtime/atomic.py
++++ b/runtime/src/roboenv_runtime/runtime/atomic.py
+@@ -11,6 +11,7 @@ from __future__ import annotations
+ 
+ import contextlib
+ import datetime as dt
++import errno
+ import fcntl
+ import json
+ import os
+@@ -57,13 +58,23 @@ def append_jsonl(path: str | os.PathLike[str], record: Mapping[str, Any]) -> Non
+     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+     flags |= getattr(os, "O_CLOEXEC", 0)
+     fd = os.open(target, flags, 0o600)
++    locked = False
+     try:
+-        fcntl.flock(fd, fcntl.LOCK_EX)
++        try:
++            fcntl.flock(fd, fcntl.LOCK_EX)
++            locked = True
++        except OSError as exc:
++            # Some shared filesystems expose flock(2) but return ENOSYS. The
++            # caller's thread lock plus one O_APPEND write still prevents
++            # partial records within this supervisor process.
++            if exc.errno != errno.ENOSYS:
++                raise
+         _write_all(fd, payload)
+         os.fsync(fd)
+     finally:
+-        with contextlib.suppress(OSError):
+-            fcntl.flock(fd, fcntl.LOCK_UN)
++        if locked:
++            with contextlib.suppress(OSError):
++                fcntl.flock(fd, fcntl.LOCK_UN)
+         os.close(fd)
+ 
+ 

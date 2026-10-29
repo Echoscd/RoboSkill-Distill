@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "name": "locate_colored_object_3d",
+  "version": "0.1.0",
+  "status": "validated",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-26",
+  "updated_at": "2026-10-26",
+  "summary": "Locate a dominant-color object in calibrated RGB-D and estimate its visible three-dimensional geometry.",
+  "tool_type": "composite",
+  "domains": ["perception", "rgbd", "geometry"],
+  "generality": {
+    "score": 6,
+    "rationale": "The implementation is category-independent and useful across manipulation tasks, but is limited to separable HSV colors and one dominant component.",
+    "assumptions": [
+      "The target has a supported dominant HSV color.",
+      "Registered metric depth and calibrated camera extrinsics are available.",
+      "The largest nearby same-color component represents one target object."
+    ],
+    "limitations": [
+      "Same-color clutter can select or merge the wrong instance.",
+      "Transparent, reflective, heavily occluded, or background-colored objects are unreliable.",
+      "The returned axis and endpoints describe visible geometry, not a semantic object model."
+    ],
+    "tested_tasks": [
+      "robotwin/adjust-bottle-aloha-agilex",
+      "robotwin/stack-blocks-three-aloha-agilex"
+    ]
+  },
+  "level": {
+    "score": 4,
+    "rationale": "It composes image segmentation, component selection, depth projection, frame transformation, and visible-geometry estimation into one observation."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": "Currently monolithic; planned decomposition into segmentation, mask-to-point-cloud, and geometry-estimation atomic tools."
+  },
+  "provenance": {
+    "experiment": "adjust-bottle",
+    "iteration": "iter_001",
+    "failure_gap": "The baseline model lacked a configured detector and could not ground the color-described target in metric world coordinates.",
+    "evidence": [
+      "experiment/adjust-bottle historical iter_001 trace",
+      "adjust-bottle iter_008 successful full-task trace",
+      "stack-blocks-three iter_001: unchanged tool localized red, green, and blue blocks"
+    ]
+  }
+}
+

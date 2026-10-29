@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "name": "plan_colored_bottle_grasp",
+  "version": "0.1.0",
+  "status": "validated",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-26",
+  "updated_at": "2026-10-26",
+  "summary": "Generate an IK-checked top-down grasp sequence for a color-described bottle lying on a support surface.",
+  "tool_type": "composite",
+  "domains": ["grasping", "planning", "inverse-kinematics"],
+  "generality": {
+    "score": 3,
+    "rationale": "It supports bottle pose variation but hard-codes cylindrical bottle geometry, diameter ranges, top-down parallel-jaw grasping, and task-specific TCP heuristics.",
+    "assumptions": [
+      "The target is a rigid elongated bottle lying on a locally planar support.",
+      "The bottle can be detected by a supported dominant color.",
+      "A top-down parallel-jaw grasp around the bottle body is appropriate."
+    ],
+    "limitations": [
+      "Does not generalize to handles, articulated objects, deformables, suction, or side grasps.",
+      "Uses discrete IK reachability rather than continuous collision-checked trajectory planning.",
+      "Bottle-specific size bounds and center-plane correction are embedded in the implementation."
+    ],
+    "tested_tasks": ["robotwin/adjust-bottle-aloha-agilex"]
+  },
+  "level": {
+    "score": 7,
+    "rationale": "It combines RGB-D localization, support and bottle geometry, grasp candidate construction, TCP compensation, profile constraints, and batch IK into an executable sequence."
+  },
+  "composition": {
+    "dependencies": ["locate_colored_object_3d"],
+    "strategy": "Use color-grounded geometry to construct and rank top-down pregrasp, grasp, and test-lift candidates that all pass arm IK."
+  },
+  "provenance": {
+    "experiment": "adjust-bottle",
+    "iteration": "iter_002 through iter_007",
+    "failure_gap": "The learner could localize the target but could not consistently account for TCP offset, legal gripper commands, object geometry, and reachable grasp poses.",
+    "evidence": ["iter_002 initial planner trace", "iter_006 corrected geometry trace", "iter_007 verified grasp trace"]
+  }
+}
+

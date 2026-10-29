@@ -1,0 +1,13 @@
+This is a read-only integration smoke test for the Kinex online recorder.
+
+Read the live RoboTwin scene from the head_camera exactly once. Use the normal
+Kinex device interface and report briefly what is visible. Then stop.
+
+Strict test constraints:
+- Do not move either arm.
+- Do not open or close either gripper.
+- Do not write to any device.
+- Do not call servo, exec, bash, or create/modify tools.
+- Do not claim that the RoboTwin task was completed.
+- If the camera read fails, report the exact tool error and stop.
+

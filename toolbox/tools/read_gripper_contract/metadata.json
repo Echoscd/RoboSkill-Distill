@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "name": "read_gripper_contract",
+  "version": "0.1.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-26",
+  "updated_at": "2026-10-26",
+  "summary": "Expose profile-declared gripper limits, geometry axes, mounting, TCP offset, and live aperture without model guesswork.",
+  "tool_type": "atomic",
+  "domains": ["introspection", "grasping", "safety"],
+  "generality": {
+    "score": 9,
+    "rationale": "The tool reads standardized Kinex gripper profiles and is independent of object class, task, scene, robot brand, and perception method.",
+    "assumptions": [
+      "The gripper exposes Kinex control, aperture, frames, geometry, and mount profile fields.",
+      "The profile calibration accurately represents the active hardware or simulator."
+    ],
+    "limitations": [
+      "It reports declared limits but does not prove collision safety or grasp suitability.",
+      "It cannot infer missing finger-pad dimensions that the device profile does not calibrate."
+    ],
+    "tested_tasks": ["robotwin/stack-blocks-three-aloha-agilex"]
+  },
+  "level": {
+    "score": 2,
+    "rationale": "It performs one bounded introspection operation and normalizes profile fields into a planner-facing contract."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": "Read and validate one device profile plus its live aperture state."
+  },
+  "provenance": {
+    "experiment": "stack-blocks-three",
+    "iteration": "iter_002",
+    "failure_gap": "Qwen issued out-of-range gripper commands because it guessed the gripper control convention.",
+    "evidence": ["iter_001 contains three gripper target bound violations"]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "verify_joint_arrival",
+  "version": "0.1.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-29",
+  "updated_at": "2026-10-29",
+  "summary": "Separate joint command acceptance/completion from measured arrival with explicit tolerance evidence.",
+  "tool_type": "atomic",
+  "domains": ["execution", "verification", "joint-control"],
+  "generality": {
+    "score": 10,
+    "rationale": "Applies to any Kinex joint device and any joint-space Servo target without task or object assumptions.",
+    "assumptions": ["The joint device reports measured positions in the same order and units as the command."],
+    "limitations": ["Does not verify Cartesian pose, physical contact, visual effect, or task success."],
+    "tested_tasks": ["robotwin/press-stapler-aloha-agilex (harness_v2_iter_004 pending)"]
+  },
+  "level": {
+    "score": 2,
+    "rationale": "One live read plus a deterministic per-joint tolerance comparison."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": "Read measured positions once and compare them with the executed target."
+  },
+  "provenance": {
+    "experiment": "press-stapler",
+    "iteration": "harness_v2_iter_003",
+    "failure_gap": "Execution receipts showed accepted/completed but not reached, causing failure analysis to misread the planned retreat as a failed press arrival.",
+    "evidence": [
+      "harness_v2_iter_003 produced four completed Servo calls with reached=null",
+      "failure analysis compared the final retreat state against the press stage and inferred a false controller failure"
+    ]
+  }
+}

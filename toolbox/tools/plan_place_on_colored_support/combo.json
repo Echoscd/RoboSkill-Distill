@@ -1,0 +1,9 @@
+{
+  "name": "plan_place_on_colored_support",
+  "steps": [
+    {"tool": "estimate_colored_object_geometry_3d", "role": "measure the support center and visible top"},
+    {"tool": "plan_top_down_parallel_place", "role": "preserve the held TCP orientation and validate placement waypoints"}
+  ],
+  "side_effects": "read-only planning; camera, frame, state, and IK queries only",
+  "execution_boundary": "returns a plan and never commands the robot"
+}

@@ -1,0 +1,38 @@
+name: estimate_colored_object_geometry_3d
+version: 0.1.0
+title: Estimate Colored Object Geometry 3D
+kind: perception
+description: >-
+  Capture calibrated world-mounted RGB-D and estimate a dominant-color tabletop
+  object's center, local support height, top height, horizontal footprint axes,
+  footprint extents, and preferred parallel-jaw closing axis. This is generic
+  support-relative geometry, not a bottle model. It assumes a locally horizontal
+  support and returns uncertainty notes; re-observe after moving the scene.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    camera:
+      type: string
+      description: Loaded calibrated RGB-D camera mounted in world.
+    color:
+      type: string
+      enum: [green, red, blue, yellow, orange, white, black]
+    min_area_px:
+      type: integer
+      minimum: 20
+      maximum: 10000
+      default: 80
+  required: [camera, color]
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 20
+device_inputs:
+  camera:
+    types: [rgbd]
+requires: intrinsics:rgb,intrinsics:depth,extrinsics:mount

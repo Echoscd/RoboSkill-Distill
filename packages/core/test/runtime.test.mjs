@@ -1379,6 +1379,7 @@ test('builtin prerequisites validate selected devices and retain custom global g
     const dir = path.join(directory, '.kinex/tools', folder)
     await mkdir(dir, { recursive: true })
     await writeFile(path.join(dir, 'tool.yaml'), manifest + '\ninterpreter: python3\n')
+    await writeFile(path.join(dir, 'toolbook.yaml'), `schema_version: 1\nname: ${folder.replaceAll('-', '_')}\n`)
     // Isolate manifest gates from the tools' numerical and device operations.
     await writeFile(path.join(dir, 'tool.py'), 'from kinex import finish\nfinish({"entered": True})\n')
   }
@@ -1390,6 +1391,19 @@ test('builtin prerequisites validate selected devices and retain custom global g
     assert.ok(!result.isError, result.output)
     assert.deepEqual(JSON.parse(result.output), { entered: true })
   }
+  const unknown = await runtime.tools.call('locate_object_3d', { camera: 'camera', model: 'detection', prompt: 'cup' }, { sessionID: 's' })
+  assert.match(unknown.output, /must name a registered device ID, not a device type/)
+  assert.match(unknown.output, /Compatible devices \(detection \| segmentation\): detector/)
+  assert.match(unknown.output, /Tool contract: .*tool\.yaml/)
+  assert.match(unknown.output, /Tool manual: .*toolbook\.yaml/)
+  assert.match(unknown.output, /Tool implementation: .*tool\.py/)
+  assert.match(unknown.output, /before asking the user, retrying, or writing an ad-hoc replacement/)
+  const failureFiles = await readdir(path.join(directory, '.kinex/failurebox/events'))
+  assert.ok(failureFiles.some(file => file.endsWith('.json')))
+  const failureEvent = JSON.parse(await readFile(path.join(directory, '.kinex/failurebox/events', failureFiles[0]), 'utf8'))
+  assert.equal(failureEvent.tool.name, 'locate_object_3d')
+  assert.equal(failureEvent.call.arguments.model, 'detection')
+  assert.equal(failureEvent.resolution.status, 'open')
   const unloaded = await runtime.tools.call('locate_object_3d', { camera: 'unused', model: 'detector', prompt: 'cup' }, { sessionID: 's' })
   assert.match(unloaded.output, /unused.*unloaded/)
   const wrong = await runtime.tools.call('run_policy', { model: 'camera', command: [{ device: 'arm' }], observation: {} }, { sessionID: 's' })

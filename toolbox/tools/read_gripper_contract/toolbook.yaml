@@ -1,0 +1,43 @@
+schema_version: 1
+name: read_gripper_contract
+version: 0.1.0
+summary: >-
+  Expose profile-declared gripper limits, geometry axes, mounting, TCP offset, and live aperture without model guesswork.
+usage:
+  when_to_use:
+    - Use when the current task and observation satisfy every field in tool.yaml.
+  when_not_to_use:
+    - Do not guess missing devices, frames, calibration, geometry, or measurements.
+  prerequisites:
+    - Read the concise contract in tool.yaml before constructing arguments.
+  examples: []
+parameters:
+  gripper:
+    meaning: Gripper profile and live aperture to inspect.
+    format: Loaded gripper device ID string.
+    unit: null
+    frame: null
+    source: Device inventory.
+    constraints: [Device type must be gripper.]
+    do_not: [Do not pass a device type or arm ID.]
+  arm:
+    meaning: Expected parent arm used to validate the mount.
+    format: Optional loaded joint device ID string.
+    unit: null
+    frame: null
+    source: Current robot configuration.
+    constraints: [When supplied it must match gripper extrinsics.mount.parent.]
+    do_not: [Do not use it to override the declared mount.]
+returns:
+  summary: Profile-declared command and aperture bounds, approach and closing axes, mount, TCP offset, and current measured aperture.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py]
+  known_failures: []
+  recovery:
+    - Re-read the parameter descriptions and verify device IDs, units, and coordinate frames.
+    - If the contract is satisfied but the call still fails, inspect the entrypoint and implementation source.
+    - Record the failed call in failurebox before changing the tool.
+source:
+  entrypoint: tool.py
+  implementation: [gripper_contract.py]
+  tests: []

@@ -1,0 +1,62 @@
+name: build_linear_contact_waypoints
+version: 0.1.1
+title: Build Linear Contact Waypoints
+kind: perception
+description: >-
+  Convert a measured world-frame contact point and outward surface normal into
+  four deterministic approach/contact/press/retreat TCP-pose variants. This
+  tool does not select an arm, solve IK, check collision, or execute motion.
+  It places the TCP origin at the supplied point, not a modeled finger or pad.
+  An open gripper can straddle a narrow target without touching it.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    contact_point_world_m:
+      type: array
+      items: {type: number}
+      minItems: 3
+      maxItems: 3
+      description: Target TCP-origin position [x,y,z] in world meters at the nominal contact stage; not verified physical first touch.
+    surface_outward_normal_world:
+      type: array
+      items: {type: number}
+      minItems: 3
+      maxItems: 3
+      description: Unitable normal from material into free space; pressing uses its negative.
+    preferred_tangent_axis_world:
+      type: array
+      items: {type: number}
+      minItems: 3
+      maxItems: 3
+      default: [1, 0, 0]
+    approach_distance_m: {type: number, minimum: 0.03, maximum: 0.25, default: 0.10}
+    press_distance_m: {type: number, minimum: 0.002, maximum: 0.08, default: 0.03}
+    observation_id: {type: string, minLength: 1}
+    observed_at_s: {type: number, minimum: 0}
+    valid_for_s: {type: number, exclusiveMinimum: 0, maximum: 30, default: 5}
+    position_uncertainty_m: {type: number, minimum: 0, maximum: 0.05}
+  required:
+    - contact_point_world_m
+    - surface_outward_normal_world
+    - observation_id
+    - observed_at_s
+    - position_uncertainty_m
+  examples:
+    - contact_point_world_m: [MEASURED_X, MEASURED_Y, MEASURED_Z]
+      surface_outward_normal_world: [0, 0, 1]
+      preferred_tangent_axis_world: [1, 0, 0]
+      approach_distance_m: 0.10
+      press_distance_m: 0.03
+      observation_id: CURRENT_OBSERVATION_ID
+      observed_at_s: CURRENT_OBSERVATION_TIME
+      position_uncertainty_m: MEASURED_UNCERTAINTY
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 10
+requires: intrinsics:geometry

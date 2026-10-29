@@ -1,0 +1,6 @@
+list_device_inventory
+read_gripper_contract
+plan_reachable_linear_contact
+verify_joint_arrival
+wait_for_joint_arrival
+inspect_episode_video

@@ -1,0 +1,10 @@
+read_gripper_contract
+locate_colored_object_3d
+estimate_colored_object_geometry_3d
+plan_top_down_parallel_grasp
+plan_colored_top_down_grasp
+plan_top_down_parallel_place
+plan_place_on_colored_support
+verify_colored_object_grasp
+plan_colored_bottle_grasp
+plan_held_bottle_transfer

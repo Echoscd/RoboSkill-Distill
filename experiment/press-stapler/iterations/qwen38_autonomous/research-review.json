@@ -1,0 +1,26 @@
+{
+  "schema": "kinex/research-review/1",
+  "recorded_on": "2026-10-29",
+  "severity": "critical_methodology",
+  "not_model_context": true,
+  "evidence_run": "experiment/press-stapler/runs/qwen38_video/qwen38_video_iter001_20261029",
+  "issues": [
+    {
+      "code": "PRESCRIBED_EXECUTION_CONFOUNDS_AUTONOMY",
+      "finding": "The action prompt supplied the perception route, planner, arm candidates, normal, distances, ordered stages, speed, arrival tolerance, and timeout. It also referred to earlier iterations. This run is a researcher-prescribed execution diagnostic, not an autonomous planning baseline.",
+      "correction": "Use one shared task-independent instruction and a task_id/goal-only task file. Save the prompt hash. Keep research history exclusively in supervisor artifacts.",
+      "status": "new_prompt_and_launcher_implemented"
+    },
+    {
+      "code": "TCP_ORIGIN_IS_NOT_A_CONTACT_FEATURE",
+      "finding": "The waypoint builder places the TCP origin at contact_point_world_m. The solver correctly transforms that TCP into the flange frame, but no parameter specifies a physical finger contact feature, its pose in the TCP frame, aperture-dependent offset, or contact patch. A narrow target can lie between open fingers. Discrete IK does not validate material contact.",
+      "user_hypothesis": "Press with one finger on the stapler upper surface instead of aligning the whole gripper center with it.",
+      "confirmed": ["No contact-feature offset is represented", "No physical contact validation is performed", "The latest run timed out at contact before formal press execution"],
+      "unconfirmed": ["Which link, if any, touched or collided during the latest run", "Whether finger gap, target localization, collision, or controller behavior caused the contact-stage stall"],
+      "next_geometry_requirement": "Represent a calibrated physical contact feature and gripper state; map its desired world pose to TCP/flange pose, then separately check clearance and effect. Do not invent an offset or merely increase press depth.",
+      "status": "contract_limitations_exposed_geometry_not_fixed"
+    }
+  ],
+  "run_started": false,
+  "comparison_note": "The new prompt is not byte-comparable with the prescribed run. Tool warning changes must also be reported; do not attribute future gains to the model alone."
+}

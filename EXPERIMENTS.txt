@@ -1,0 +1,51 @@
+RoboSkill-Distill / Kinex research snapshot
+=========================================
+
+This repository retains Kinex upstream history and adds the experiment code used
+for Qwen/GPT-assisted tool exploration on RoboTwin. Upstream Kinex documentation
+and license remain at the repository root.
+
+Code map
+  experiment/press-stapler/scripts/run-qwen38-autonomous.sh : current entry point
+  experiment/prompts/robot_agent.txt : shared task-independent instruction
+  experiment/harness/online : observe-only recorder and stream safeguards
+  experiment/lib : native evaluation, failure analysis, and HTML trace export
+  experiment/device-check/scripts : deterministic simulator compatibility checks
+  experiment/tool-formulator : tool formulation queue and supporting code
+  toolbox/tools : implementation, compact interface, detailed manual, and history
+  toolbox/failurebox : reviewed tool-call failure records
+  experiment/dependency-patches : pinned external sources and local source patches
+
+Local prerequisites
+  Follow the upstream Kinex and RoboEnv setup instructions. Runtime files live in
+  env/ and are intentionally excluded from Git. The experiment scripts expect
+  env/source (installed Kinex source/runtime), env/RoboEnv, env/node/current,
+  env/workspace, and env/config. Model registration and API credentials must be
+  configured locally. Never commit env/secrets or auth files.
+
+Run
+  bash experiment/press-stapler/scripts/run-qwen38-autonomous.sh
+
+The launcher currently selects seed5 and OpenRouter qwen/qwen3.8-max-0902. It
+creates fresh workspace, session, configuration, and temporary directories per run.
+The existing scripts retain deployment-specific interpreter/proxy defaults; review
+common.sh and the documented environment overrides before using another machine.
+
+Evidence and limitations
+  Every run retains model messages, tool calls/results, simulator recording, native
+  verdict, and an HTML trace under experiment/<task>/runs/. Those generated files,
+  credentials, caches, environment installations, and weights are excluded here.
+  The online ledger observes native Kinex operations. Legacy enforce mode is
+  retired; this recorder does not provide a safety or filesystem isolation boundary.
+  Source access to historical artifacts is still possible on the development host.
+  A fresh prompt/session alone does not establish an independent benchmark run.
+  The latest seed5 run passed RoboTwin's native contact criterion. The current
+  press_stapler task models a static actor and does not establish full compression.
+  TCP contact planning still lacks a calibrated physical finger/pad contact feature.
+
+Verification at this snapshot
+  42 native control, motion, and scheduler tests passed.
+  10 online recorder and stream-guard tests passed.
+  Simulator checks exercised the two arms, two grippers, three RGB-D cameras,
+  world clock, and local Grounding DINO. The original endpoint-expectation failure
+  and its diagnosis are retained in local run evidence.

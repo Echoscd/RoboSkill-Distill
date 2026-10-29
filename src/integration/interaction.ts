@@ -56,7 +56,9 @@ export class Interaction {
 
   async questions(questions: Question[]): Promise<Record<string, string>> {
     const { ctx, signal } = this.current()
-    if (this.mode === "yolo") return Object.fromEntries(questions.map(question => [question.question, "you are in yolo mode, process without answer, do not ask further questions, keep going until the task is solved."]))
+    if (this.mode === "yolo") return Object.fromEntries(questions.map(question => [question.question,
+      "No user answer is available in yolo mode. Inspect the failed tool's exposed contract and implementation source, then inspect current device/profile evidence. Do not guess, invent missing facts, or retry the same failure. If safe progress remains impossible, stop and report the precise missing capability.",
+    ]))
     if (!ctx.hasUI) return Object.fromEntries(questions.map(question => [question.question, "No user answer is available. Use existing evidence and keep unknown facts unknown."]))
     const answers: Record<string, string> = {}
     for (const question of questions) {

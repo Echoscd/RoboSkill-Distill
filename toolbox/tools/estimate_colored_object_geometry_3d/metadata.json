@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "name": "estimate_colored_object_geometry_3d",
+  "version": "0.1.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-26",
+  "updated_at": "2026-10-26",
+  "summary": "Estimate support-relative center, height, footprint axes, and extents for a dominant-color tabletop object from calibrated RGB-D.",
+  "tool_type": "composite",
+  "domains": ["perception", "geometry", "grasping"],
+  "generality": {
+    "score": 6,
+    "rationale": "It supports varied rigid tabletop shapes and sizes, but segmentation is restricted to a fixed HSV color vocabulary and assumes a visible horizontal support.",
+    "assumptions": [
+      "One target object is the largest connected component of the requested color.",
+      "The camera is calibrated in world and its depth is registered to color.",
+      "The object rests on a locally horizontal visible support surface."
+    ],
+    "limitations": [
+      "Cannot separate touching same-color objects or handle arbitrary language categories.",
+      "Visible-surface footprint estimates can be biased by severe occlusion or specular depth.",
+      "Does not estimate a full mesh, collision volume, or stable grasp contacts."
+    ],
+    "tested_tasks": ["robotwin/stack-blocks-three-aloha-agilex"]
+  },
+  "level": {
+    "score": 5,
+    "rationale": "It composes color grounding, calibrated depth projection, robust support estimation, center correction, and footprint PCA."
+  },
+  "composition": {
+    "dependencies": ["locate_colored_object_3d"],
+    "strategy": "Extend color-grounded RGB-D points with support-relative prism geometry needed by object-agnostic grasp planners."
+  },
+  "provenance": {
+    "experiment": "stack-blocks-three",
+    "iteration": "iter_002",
+    "failure_gap": "Qwen localized block surface points but lacked object center, support height, dimensions, and a closing direction for grasp planning.",
+    "evidence": ["iter_001 localized all blocks but then guessed arm joint vectors"]
+  }
+}

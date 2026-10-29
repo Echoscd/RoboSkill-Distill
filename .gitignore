@@ -9,3 +9,7 @@ __pycache__/
 .env.*
 *.log
 .DS_Store
+
+# Local runtimes, credentials, model weights and generated process state.
+env/
+*.pid

@@ -21,12 +21,25 @@ import { deviceInputSchema } from "./device-input.ts"
 // `parameters` (raw JSON Schema) is sent verbatim as the input schema.
 export const ToolManifest = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, "tool name: lowercase snake_case"),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/).default("0.0.0"),
+  title: z.string().optional(),
   kind: z.enum(["perception", "controller"]),
   description: z.string(),
   parameters: z
     .record(z.string(), z.unknown())
     .default({ type: "object", properties: {} })
     .describe("JSON Schema for the args object; validated by the harness"),
+  output_schema: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("optional JSON Schema for the returned value; validated by the harness"),
+  annotations: z.object({
+    read_only: z.boolean().optional(),
+    destructive: z.boolean().optional(),
+    idempotent: z.boolean().optional(),
+    open_world: z.boolean().optional(),
+  }).optional(),
+  manual: z.string().default("toolbook.yaml").describe("on-demand manual stored beside the entry point"),
   entry: z.string().default("tool.py"),
   interpreter: z.string().optional().describe("python executable; defaults to the uv-managed Kinex core Python (.kinex/python/.venv)"),
   timeout_s: z.number().positive().default(120).describe("outer wall-clock cap for one invocation"),
@@ -41,6 +54,13 @@ export const ToolManifest = z.object({
     z.fromJSONSchema(manifest.parameters)
   } catch (error) {
     ctx.addIssue({ code: "custom", path: ["parameters"], message: error instanceof Error ? error.message : String(error) })
+  }
+  if (manifest.output_schema) {
+    try {
+      z.fromJSONSchema(manifest.output_schema)
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["output_schema"], message: error instanceof Error ? error.message : String(error) })
+    }
   }
   for (const parameter of Object.keys(manifest.device_inputs)) {
     const property = deviceInputSchema(manifest.parameters, parameter)

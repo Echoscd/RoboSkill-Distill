@@ -1,0 +1,87 @@
+name: plan_linear_contact
+version: 0.2.0
+title: Plan Linear Contact
+kind: perception
+description: >-
+  Generate an observation-grounded, IK-checked approach/contact/press/retreat
+  plan for a point contact on a locally planar surface. The target is object
+  class agnostic and can be used for buttons, switches, lids, staplers and
+  similar contact tasks. It performs no motion. Example numeric geometry is
+  illustrative only: replace it with values from the current observation and
+  pass an observation_id returned by the online harness. The input normal is
+  always the geometric OUTWARD normal pointing from the surface into free
+  space, never the desired press direction. The planner derives both approach
+  and press directions as the negative of that outward normal and returns them
+  explicitly as approach_direction_world and press_direction_world.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    arm: {type: string}
+    effector: {type: string}
+    contact_point_world_m:
+      type: array
+      items: {type: number}
+      minItems: 3
+      maxItems: 3
+    surface_outward_normal_world:
+      type: array
+      items: {type: number}
+      minItems: 3
+      maxItems: 3
+      description: >-
+        Unit need not be normalized. Must point OUT of the contacted surface
+        into free space; do not pass the desired press direction. With world +Z
+        upward, the top face of a horizontal object uses [0, 0, 1], and this
+        planner derives a downward press direction [0, 0, -1].
+    tangent_axis_world:
+      type: array
+      items: {type: number}
+      minItems: 3
+      maxItems: 3
+      default: [1, 0, 0]
+    approach_distance_m: {type: number, minimum: 0.03, maximum: 0.25, default: 0.10}
+    press_distance_m:
+      type: number
+      minimum: 0.002
+      maximum: 0.08
+      default: 0.03
+      description: Distance travelled from contact along -surface_outward_normal_world.
+    observation_id: {type: string, minLength: 1}
+    observed_at_s: {type: number, minimum: 0}
+    valid_for_s: {type: number, exclusiveMinimum: 0, maximum: 30, default: 5}
+    position_uncertainty_m: {type: number, minimum: 0, maximum: 0.05}
+  required:
+    - arm
+    - effector
+    - contact_point_world_m
+    - surface_outward_normal_world
+    - observation_id
+    - observed_at_s
+    - position_uncertainty_m
+  examples:
+    - arm: right_arm
+      effector: right_gripper
+      contact_point_world_m: [0.30, -0.10, 0.80]
+      # Top-down press with world +Z upward: outward normal is +Z and the
+      # planner-derived approach/press direction is -Z.
+      surface_outward_normal_world: [0, 0, 1]
+      tangent_axis_world: [1, 0, 0]
+      approach_distance_m: 0.10
+      press_distance_m: 0.03
+      observation_id: obs_000123
+      observed_at_s: 12.5
+      valid_for_s: 5
+      position_uncertainty_m: 0.01
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 30
+device_inputs:
+  arm: {types: [joint]}
+  effector: {types: [gripper, suction, dexterous_hand, other]}
+requires: intrinsics:kinematics,intrinsics:control,intrinsics:geometry,intrinsics:frames,extrinsics:mount

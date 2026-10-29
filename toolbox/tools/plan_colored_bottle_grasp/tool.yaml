@@ -1,0 +1,55 @@
+name: plan_colored_bottle_grasp
+version: 0.1.0
+title: Plan Colored Bottle Grasp
+kind: perception
+description: >-
+  Build a reachable top-down grasp plan for a color-described bottle lying on a
+  support surface. It captures calibrated RGB-D, segments the bottle, estimates
+  the local support height, accounts for the gripper TCP offset relative to the
+  arm flange, and verifies pre-grasp, grasp, and test-lift poses with the arm IK
+  driver. Returns world-frame flange poses and the profile-declared legal gripper
+  open/close targets. Use this before servo; never servo the arm flange directly
+  to the object's measured surface point.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    camera:
+      type: string
+      description: Loaded calibrated RGB-D camera mounted in world.
+    arm:
+      type: string
+      description: Loaded joint arm with FK/IK and a world mount.
+    gripper:
+      type: string
+      description: Loaded gripper rigidly mounted to the arm flange with a TCP frame.
+    color:
+      type: string
+      enum: [green, red, blue, yellow, orange, white, black]
+    pregrasp_distance_m:
+      type: number
+      minimum: 0.03
+      maximum: 0.20
+      default: 0.10
+    test_lift_m:
+      type: number
+      minimum: 0.03
+      maximum: 0.15
+      default: 0.06
+  required: [camera, arm, gripper, color]
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 45
+device_inputs:
+  camera:
+    types: [rgbd]
+  arm:
+    types: [joint]
+  gripper:
+    types: [gripper]
+requires: intrinsics:rgb,intrinsics:depth,extrinsics:mount

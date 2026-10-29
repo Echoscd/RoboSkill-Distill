@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kinex.local/schemas/failure-record.schema.json",
+  "title": "Kinex tool failure record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "failure_id", "occurred_at", "tool", "call", "error", "trace", "diagnosis", "resolution", "artifacts"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "failure_id": {"type": "string", "pattern": "^failure_[a-zA-Z0-9_]+$"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "tool": {
+      "type": "object",
+      "required": ["name", "version", "kind"],
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "kind": {"enum": ["perception", "controller"]}
+      }
+    },
+    "call": {"type": "object", "required": ["arguments"], "properties": {"arguments": {"type": "object"}}},
+    "error": {
+      "type": "object",
+      "required": ["stage", "code", "message"],
+      "properties": {
+        "stage": {"enum": ["selection", "validation", "runtime", "verification"]},
+        "code": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    },
+    "trace": {"type": "object"},
+    "diagnosis": {"type": "object"},
+    "resolution": {"type": "object"},
+    "artifacts": {"type": "array"}
+  }
+}

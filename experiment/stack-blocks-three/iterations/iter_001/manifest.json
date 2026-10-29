@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "iteration": "iter_001",
+  "role": "qwen_with_reused_grounding",
+  "task": "robotwin/stack-blocks-three-aloha-agilex",
+  "model": "openrouter/qwen/qwen3-vl-235b-a22b-instruct",
+  "seed": 0,
+  "predecessor": "iter_000",
+  "intent": "Test whether the color-based RGB-D grounding tool formulated for adjust-bottle transfers unchanged to three colored blocks, then collect the next capability gap.",
+  "toolset": ["locate_colored_object_3d"]
+}
+

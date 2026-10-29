@@ -1,0 +1,49 @@
+name: plan_top_down_parallel_place
+version: 0.2.0
+title: Plan Top Down Parallel Place
+kind: perception
+description: >-
+  Plan an IK-checked top-down pre-place, release, and retreat for an already-held
+  rigid object whose center coincides with the gripper TCP. It begins from the live
+  TCP orientation, searches bounded vertical-axis wrist-yaw alternatives when IK
+  requires them, verifies top-down approach, compensates the TCP offset, and
+  returns legal release commands. Provide the desired final object
+  center in world coordinates. This tool plans but never executes motion.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    arm:
+      type: string
+    gripper:
+      type: string
+    target_object_center_world_m:
+      type: array
+      items: {type: number}
+      minItems: 3
+      maxItems: 3
+    preplace_distance_m:
+      type: number
+      minimum: 0.03
+      maximum: 0.20
+      default: 0.08
+    retreat_distance_m:
+      type: number
+      minimum: 0.03
+      maximum: 0.20
+      default: 0.08
+  required: [arm, gripper, target_object_center_world_m]
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 30
+device_inputs:
+  arm:
+    types: [joint]
+  gripper:
+    types: [gripper]
+requires: intrinsics:kinematics,intrinsics:control,intrinsics:geometry,intrinsics:frames,extrinsics:mount

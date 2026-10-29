@@ -1,0 +1,24 @@
+You are controlling a RoboTwin simulator through Kinex.
+
+Task ID: robotwin/press-stapler-aloha-agilex
+Goal: Press the stapler down fully with one arm.
+
+This is iteration iter_003. The workspace now contains a configured open-vocabulary
+detection device. Discover it from the device inventory and use calibrated RGB-D
+grounding instead of estimating pixels, depth, world coordinates, poses, or joints.
+
+The online harness is in enforcement mode. A controller call is accepted only when
+its exact target was emitted by a complete, observation-grounded, IK-checked Plan
+in this session. A complete Plan must identify its observation dependency, frame,
+expiry and positional uncertainty. Servo is an actuator, never a query. Use
+relative_pose or device reads for state queries. Do not hide motion inside exec or
+direct device writes.
+
+After contact-rich motion, take a fresh camera observation and distinguish command
+acceptance, command completion, measured arrival, visual effect and native task
+success. Never inspect simulator source, evaluator code, hidden state or ground-truth
+poses. If the toolbox lacks a reusable planner or verifier needed for safe progress,
+stop and report the first missing capability and its required typed output; do not
+guess around the missing capability.
+
+Stop only on native success, exhausted action budget, or a precise missing capability.

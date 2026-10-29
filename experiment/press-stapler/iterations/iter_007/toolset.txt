@@ -1,0 +1,4 @@
+# Generic capabilities only; semantic detection is a configured device.
+list_device_inventory
+read_gripper_contract
+plan_linear_contact

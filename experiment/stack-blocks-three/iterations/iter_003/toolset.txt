@@ -1,0 +1,2 @@
+plan_colored_top_down_grasp
+plan_place_on_colored_support

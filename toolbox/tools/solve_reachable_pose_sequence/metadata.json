@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "name": "solve_reachable_pose_sequence",
+  "version": "0.1.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-29",
+  "updated_at": "2026-10-29",
+  "summary": "Select an arm-effector pair and solve chained IK for an entire task-defined TCP-pose sequence.",
+  "tool_type": "atomic",
+  "domains": ["planning", "inverse-kinematics", "manipulator-selection", "recovery"],
+  "generality": {
+    "score": 10,
+    "rationale": "Consumes generic ordered TCP poses and physical arm-effector pairs without knowing whether the task is grasping, placing, pressing, or another motion primitive.",
+    "assumptions": ["Discrete chained IK across task-complete waypoints is a useful feasibility test."],
+    "limitations": ["No continuous collision checking, dynamics, force control, motion execution, or task-effect verification."],
+    "tested_tasks": ["robotwin/press-stapler-aloha-agilex (selection behavior extracted from harness_v2 multi-arm planner)"]
+  },
+  "level": {
+    "score": 5,
+    "rationale": "Ranks physical candidates, transforms TCP poses through profiles and frames, and solves every ordered stage with chained seeds."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": ""
+  },
+  "provenance": {
+    "experiment": "press-stapler",
+    "iteration": "post_harness_v2_iter_005_refactor",
+    "failure_gap": "Arm selection and whole-sequence reachability were trapped inside a linear-contact-specific wrapper and could not be reused by grasp or place tasks.",
+    "evidence": ["Qwen fixed on right_arm and brute-forced raw IK in iter_001 even though a left-arm complete sequence was available."]
+  }
+}

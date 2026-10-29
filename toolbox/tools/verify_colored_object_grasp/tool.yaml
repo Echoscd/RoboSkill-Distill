@@ -1,0 +1,58 @@
+name: verify_colored_object_grasp
+version: 0.1.0
+title: Verify Colored Object Grasp
+kind: perception
+description: >-
+  Verify a test lift using independent RGB-D object localization, live TCP pose,
+  gripper aperture, and displacement from the pre-grasp object center. Returns a
+  strict boolean; arm arrival or a raw increase in object z alone is not success.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    camera:
+      type: string
+    arm:
+      type: string
+    gripper:
+      type: string
+    color:
+      type: string
+      enum: [green, red, blue, yellow, orange, white, black]
+    initial_center_world_m:
+      type: array
+      minItems: 3
+      maxItems: 3
+      items: {type: number}
+    object_diameter_m:
+      type: number
+      minimum: 0.02
+      maximum: 0.12
+      description: Estimated bottle diameter returned by plan_colored_bottle_grasp.
+    initial_axis_length_m:
+      type: number
+      minimum: 0.05
+      maximum: 0.50
+      description: Full pre-grasp bottle axis length returned by plan_colored_bottle_grasp.
+    minimum_lift_m:
+      type: number
+      minimum: 0.01
+      maximum: 0.12
+      default: 0.03
+  required: [camera, arm, gripper, color, initial_center_world_m, object_diameter_m, initial_axis_length_m]
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 45
+device_inputs:
+  camera:
+    types: [rgbd]
+  arm:
+    types: [joint]
+  gripper:
+    types: [gripper]
+requires: intrinsics:rgb,intrinsics:depth,extrinsics:mount

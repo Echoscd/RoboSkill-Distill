@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "iteration": "iter_002",
+  "role": "qwen_with_composed_generic_grasp_planner",
+  "task": "robotwin/stack-blocks-three-aloha-agilex",
+  "model": "openrouter/qwen/qwen3-vl-235b-a22b-instruct",
+  "seed": 0,
+  "predecessor": "iter_001",
+  "intent": "Test whether GPT-formulated reusable primitives and their high-level combo bridge Qwen from color localization to a legal TCP-correct IK-checked grasp, without adding block- or stack-specific code.",
+  "toolset": ["plan_colored_top_down_grasp"]
+}

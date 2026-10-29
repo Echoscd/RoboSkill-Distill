@@ -1,0 +1,34 @@
+name: read_gripper_contract
+version: 0.1.0
+title: Read Gripper Contract
+kind: perception
+description: >-
+  Read a gripper's profile-declared command bounds, legal open/close targets,
+  aperture range, local approach and closing axes, mounting relationship, TCP
+  offset, and current aperture. Call this instead of guessing normalized gripper
+  commands or treating the arm flange as the fingertip TCP.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    gripper:
+      type: string
+      description: Loaded gripper device to inspect.
+    arm:
+      type: string
+      description: Optional expected parent arm; mismatch is reported as an error.
+  required: [gripper]
+  examples:
+    - {gripper: right_gripper, arm: right_arm}
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 10
+device_inputs:
+  gripper:
+    types: [gripper]
+requires: intrinsics:control,intrinsics:geometry,intrinsics:frames,extrinsics:mount

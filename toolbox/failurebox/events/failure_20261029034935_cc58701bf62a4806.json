@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "failure_id": "failure_20261029034935_cc58701bf62a4806",
+  "occurred_at": "2026-10-29T03:49:35.585Z",
+  "tool": {
+    "name": "plan_linear_contact",
+    "version": "0.2.0",
+    "kind": "perception"
+  },
+  "call": {
+    "arguments": {
+      "arm": "right_arm",
+      "effector": "right_gripper",
+      "contact_point_world_m": [
+        -0.12613002825892072,
+        -0.09784850197510342,
+        0.7616136235186722
+      ],
+      "surface_outward_normal_world": [
+        0,
+        0,
+        1
+      ],
+      "tangent_axis_world": [
+        1,
+        0,
+        0
+      ],
+      "approach_distance_m": 0.1,
+      "press_distance_m": 0.03,
+      "observation_id": "obs_000028",
+      "observed_at_s": 69.52,
+      "valid_for_s": 5,
+      "position_uncertainty_m": 0.01
+    }
+  },
+  "error": {
+    "stage": "runtime",
+    "code": "PyToolError",
+    "message": "Traceback (most recent call last):\n  File \"/LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/tools/plan_linear_contact/tool.py\", line 31, in <module>\n    main()\n  File \"/LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/tools/plan_linear_contact/tool.py\", line 12, in main\n    finish(plan_linear_contact(\n           ^^^^^^^^^^^^^^^^^^^^\n  File \"/LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/tools/plan_linear_contact/core.py\", line 109, in plan_linear_contact\n    seed = _ik(arm, flange, world_to_arm, seed)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/tools/plan_linear_contact/core.py\", line 42, in _ik\n    result = device(arm, \"ik\", {\"pose\": _flat_pose(arm_flange_rt), \"seed\": seed})\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/LargeModelDev/users/chendong.song/kinex/env/source/packages/core/assets/python/kinex/__init__.py\", line 130, in device\n    return _device_result(\"device\", values, _rpc({\"call\": \"device\", **values})[\"result\"])\n                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/LargeModelDev/users/chendong.song/kinex/env/source/packages/core/assets/python/kinex/__init__.py\", line 91, in _rpc\n    raise RPCError(response.get(\"error\", \"harness call failed\"),\nkinex.RPCError: driver for \"right_arm\" failed: IK search exhausted (time budget); seeds_attempted=5, iterations=178, elapsed_ms=100.135, position_error_m=0.0003627207858503792, rotation_error_rad=1.3238760096036011e-05"
+  },
+  "trace": {
+    "session_id": "01a185c6-5cd7-7570-810c-8c112cda6902",
+    "run_id": null,
+    "trace_ref": null
+  },
+  "diagnosis": {
+    "status": "unreviewed",
+    "category": null,
+    "root_cause": null,
+    "confidence": null
+  },
+  "resolution": {
+    "status": "open",
+    "tool_version": null,
+    "change_log_ref": null,
+    "notes": null
+  },
+  "artifacts": []
+}

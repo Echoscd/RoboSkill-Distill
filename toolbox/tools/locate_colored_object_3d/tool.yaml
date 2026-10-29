@@ -1,0 +1,42 @@
+name: locate_colored_object_3d
+version: 0.1.0
+title: Locate Colored Object 3D
+kind: perception
+description: >-
+  Deterministically locate the largest object of a supported color in an RGB-D
+  camera frame. Uses HSV segmentation and registered metric depth; it never
+  invents pixels, depth, intrinsics, or coordinates. Returns the mask bounding
+  box, center, image major axis, narrow end, robust depth statistics, and 3D
+  points in both camera optical and world frames. Supported colors are green,
+  red, blue, yellow, orange, white, and black. Use this instead of
+  locate_object_3d when no detection/segmentation device is configured and the
+  task identifies the target by color.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    camera:
+      type: string
+      description: Loaded RGB-D camera with calibrated intrinsics and a world mount.
+    color:
+      type: string
+      enum: [green, red, blue, yellow, orange, white, black]
+      description: Target object's dominant visible color.
+    min_area_px:
+      type: integer
+      minimum: 20
+      default: 80
+      description: Reject connected components smaller than this many pixels.
+  required: [camera, color]
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 30
+device_inputs:
+  camera:
+    types: [rgbd]
+requires: intrinsics:rgb,intrinsics:depth,extrinsics:mount

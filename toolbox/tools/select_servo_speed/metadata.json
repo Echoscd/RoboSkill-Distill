@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "select_servo_speed",
+  "version": "0.1.1",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-29",
+  "updated_at": "2026-10-29",
+  "summary": "Select the slowest Servo speed that fits an explicit trajectory-duration budget.",
+  "tool_type": "atomic",
+  "domains": ["execution", "planning", "joint-control", "timeout-prevention"],
+  "generality": {
+    "score": 10,
+    "rationale": "Uses only a generic joint target, live joint state, and Servo's task-independent trajectory model.",
+    "assumptions": ["The blocking world wait must complete within a known experiment/RPC budget."],
+    "limitations": ["World-clock duration does not predict wall time when the simulator runs slower than real time.", "Does not command motion, verify arrival, check collision, or establish task effect."],
+    "tested_tasks": ["robotwin/press-stapler-aloha-agilex (harness_v2_iter_005 exposed world-time versus wall-time distinction)"]
+  },
+  "level": {
+    "score": 3,
+    "rationale": "One state read plus deterministic evaluation and selection across bounded Servo trajectory candidates."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": "Evaluate Servo's trajectory generator at allowed speed fractions and select the slowest candidate within the duration budget."
+  },
+  "provenance": {
+    "experiment": "press-stapler",
+    "iteration": "harness_v2_iter_004",
+    "failure_gap": "Qwen chose speedFraction=0.2; the first blocking Servo exceeded its wait budget, stopped halfway, and verify_joint_arrival correctly rejected the partial motion.",
+    "evidence": [
+      "approach Servo failed after about 61.8 wall seconds",
+      "measured joints remained far from the approach target and native_success=false"
+    ]
+  }
+}

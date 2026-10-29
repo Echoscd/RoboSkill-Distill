@@ -1,0 +1,87 @@
+name: solve_reachable_pose_sequence
+version: 0.1.0
+title: Solve Reachable Pose Sequence
+kind: perception
+description: >-
+  Select an arm-effector pair and pose-sequence variant by solving chained IK
+  for every ordered world-frame TCP waypoint. A candidate is accepted only if
+  the entire sequence is reachable. This tool never moves the robot.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    arm_effector_pairs:
+      type: array
+      minItems: 1
+      maxItems: 4
+      items:
+        type: object
+        additionalProperties: false
+        required: [arm, effector]
+        properties:
+          arm: {type: string, description: Loaded joint device ID.}
+          effector: {type: string, description: Loaded mounted effector whose TCP defines the poses.}
+    pose_sequence_variants:
+      type: array
+      minItems: 1
+      maxItems: 8
+      items:
+        type: object
+        additionalProperties: false
+        required: [variant_id, waypoints]
+        properties:
+          variant_id: {type: string, minLength: 1}
+          metadata: {type: object, description: Opaque task-specific variant metadata.}
+          waypoints:
+            type: array
+            minItems: 1
+            maxItems: 16
+            items:
+              type: object
+              additionalProperties: false
+              required: [stage, tcp_pose_world]
+              properties:
+                stage: {type: string, minLength: 1}
+                tcp_pose_world:
+                  type: array
+                  items: {type: number}
+                  minItems: 7
+                  maxItems: 7
+                  description: World TCP pose [x,y,z,qx,qy,qz,qw], meters and unit quaternion.
+    based_on:
+      type: array
+      minItems: 1
+      items: {type: string, minLength: 1}
+    observed_at_s: {type: number, minimum: 0}
+    expires_at_s: {type: number, exclusiveMinimum: 0}
+    position_uncertainty_m: {type: number, minimum: 0, maximum: 0.05}
+  required:
+    - arm_effector_pairs
+    - pose_sequence_variants
+    - based_on
+    - observed_at_s
+    - expires_at_s
+    - position_uncertainty_m
+  examples:
+    - arm_effector_pairs:
+        - {arm: CANDIDATE_ARM_A, effector: MATCHED_EFFECTOR_A}
+        - {arm: CANDIDATE_ARM_B, effector: MATCHED_EFFECTOR_B}
+      pose_sequence_variants:
+        - variant_id: ORIENTATION_VARIANT_A
+          metadata: {orientation_policy: TASK_DEFINED}
+          waypoints:
+            - {stage: approach, tcp_pose_world: [X1, Y1, Z1, QX1, QY1, QZ1, QW1]}
+            - {stage: action, tcp_pose_world: [X2, Y2, Z2, QX2, QY2, QZ2, QW2]}
+      based_on: [CURRENT_OBSERVATION_ID]
+      observed_at_s: CURRENT_OBSERVATION_TIME
+      expires_at_s: CURRENT_PLAN_EXPIRY
+      position_uncertainty_m: MEASURED_UNCERTAINTY
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 60
+requires: intrinsics:kinematics,intrinsics:geometry,intrinsics:frames,extrinsics:mount

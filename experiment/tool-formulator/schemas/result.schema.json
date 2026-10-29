@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kinex tool formulation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "diagnosis", "tools", "validation", "notes"],
+  "properties": {
+    "decision": {
+      "enum": ["no_tool", "create_tool", "update_tool", "blocked"]
+    },
+    "diagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["failure_type", "capability_gap", "summary", "evidence"],
+      "properties": {
+        "failure_type": {
+          "enum": ["perception", "planning", "execution", "verification", "policy_prompt", "runtime", "unknown"]
+        },
+        "capability_gap": {"type": "boolean"},
+        "summary": {"type": "string"},
+        "evidence": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "change", "generality", "level", "files", "tests"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "change": {"enum": ["created", "updated"]},
+          "generality": {"type": "integer", "minimum": 1, "maximum": 10},
+          "level": {"type": "integer", "minimum": 1, "maximum": 10},
+          "files": {"type": "array", "items": {"type": "string"}},
+          "tests": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "commands"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "commands": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}
+

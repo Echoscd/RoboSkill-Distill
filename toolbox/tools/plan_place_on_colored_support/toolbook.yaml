@@ -1,0 +1,99 @@
+schema_version: 1
+name: plan_place_on_colored_support
+version: 0.1.0
+summary: >-
+  Compose colored support geometry and TCP-preserving placement planning into IK-checked stacking stages for an already-held object.
+usage:
+  when_to_use:
+    - Use when the current task and observation satisfy every field in tool.yaml.
+  when_not_to_use:
+    - Do not guess missing devices, frames, calibration, geometry, or measurements.
+  prerequisites:
+    - Read the concise contract in tool.yaml before constructing arguments.
+  examples: []
+parameters:
+  camera:
+    meaning: RGB-D camera used to localize the support top.
+    format: Loaded RGB-D device ID string.
+    unit: null
+    frame: null
+    source: Device inventory.
+    constraints: [Requires calibrated RGB, depth, and world mount.]
+    do_not: [Do not reuse pre-grasp imagery after transfer.]
+  arm:
+    meaning: Arm holding the object.
+    format: Loaded joint device ID string.
+    unit: null
+    frame: null
+    source: Device inventory and grasp trace.
+    constraints: [Must provide live state and IK.]
+    do_not: [Do not use if grasp verification failed.]
+  gripper:
+    meaning: Gripper holding the object.
+    format: Loaded gripper device ID string.
+    unit: null
+    frame: null
+    source: Device inventory and grasp trace.
+    constraints: [Must define TCP and legal release command.]
+    do_not: [Do not guess release values.]
+  support_color:
+    meaning: Dominant visible color of the destination support.
+    format: Supported color enum.
+    unit: null
+    frame: null
+    source: Task grounding and current RGB observation.
+    constraints: [Largest matching component is treated as support.]
+    do_not: [Do not use when same-color distractors dominate.]
+  held_object_height_m:
+    meaning: Full vertical height of the held object used to place its bottom on the support top.
+    format: Positive number in [0.008, 0.25].
+    unit: m
+    frame: object vertical
+    source: object.height_m from the preceding grasp or geometry plan.
+    constraints: [Must describe the same object currently held.]
+    do_not: [Do not substitute diameter or camera depth.]
+  placement_clearance_m:
+    meaning: Small final gap added between object bottom and support top.
+    format: Number in [0, 0.01].
+    unit: m
+    frame: world vertical
+    source: Placement policy.
+    constraints: [Use small values to avoid hovering.]
+    do_not: [Do not use as preplace distance.]
+  min_area_px:
+    meaning: Support segmentation component threshold.
+    format: Integer in [20, 10000].
+    unit: px
+    frame: null
+    source: Camera resolution and expected support footprint.
+    constraints: [Must remain below visible support area.]
+    do_not: [Do not express metric area.]
+  preplace_distance_m:
+    meaning: Vertical clearance above final placement center.
+    format: Number in [0.03, 0.20].
+    unit: m
+    frame: world vertical
+    source: Local clearance policy.
+    constraints: [Must allow safe approach.]
+    do_not: [Do not add it to final object height.]
+  retreat_distance_m:
+    meaning: Vertical retreat after release.
+    format: Number in [0.03, 0.20].
+    unit: m
+    frame: world vertical
+    source: Local clearance policy.
+    constraints: [Must clear the released object.]
+    do_not: [Do not retreat before release completion.]
+returns:
+  summary: Current support geometry and TCP-compensated preplace, place, release, and retreat stages with legal gripper release.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py]
+  known_failures: []
+  recovery:
+    - Re-read the parameter descriptions and verify device IDs, units, and coordinate frames.
+    - If the contract is satisfied but the call still fails, inspect the entrypoint and implementation source.
+    - Record the failed call in failurebox before changing the tool.
+source:
+  entrypoint: tool.py
+  implementation: [combo.json]
+  tests: []

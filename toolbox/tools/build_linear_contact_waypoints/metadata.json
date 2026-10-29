@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "name": "build_linear_contact_waypoints",
+  "version": "0.1.1",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-29",
+  "updated_at": "2026-10-29",
+  "summary": "Build arm-independent TCP waypoint variants for a straight surface-normal contact task.",
+  "tool_type": "atomic",
+  "domains": ["contact", "geometry", "planning"],
+  "generality": {
+    "score": 5,
+    "rationale": "Reusable TCP-origin geometry, but physical contact features and aperture-dependent offsets are absent; cross-task press transfer is unvalidated.",
+    "assumptions": ["A straight surface-normal sequence is appropriate and TCP-origin targeting suits the intended contact feature."],
+    "limitations": ["Does not model a finger/pad contact feature or aperture-dependent offset.", "Does not select a manipulator, solve IK, check collision, execute motion, or cover grasp/place semantics."],
+    "tested_tasks": ["robotwin/press-stapler-aloha-agilex (geometry behavior preserved from harness_v2 iterations)"]
+  },
+  "level": {
+    "score": 3,
+    "rationale": "Deterministically derives four short TCP-pose sequences from measured point-normal contact geometry."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": ""
+  },
+  "provenance": {
+    "experiment": "press-stapler",
+    "iteration": "post_harness_v2_iter_005_refactor",
+    "failure_gap": "Linear-contact geometry was inseparably coupled to multi-arm selection and IK, preventing reuse of arm selection for grasp and place tasks.",
+    "evidence": ["plan_reachable_linear_contact mixed contact-specific waypoint construction with generic manipulator reachability search."]
+  }
+}

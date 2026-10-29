@@ -1,0 +1,14 @@
+Analyze this recorded RoboTwin manipulation attempt from the supplied ordered video frames.
+
+Task goal: press the red stapler down fully once using one robot arm.
+Authoritative simulator outcome: native_success=false. Accept this label; explain what the visual evidence can and cannot establish about the failure.
+
+The images cover the recorded episode in chronological order. Each image is preceded by its original source-frame index and video timestamp. These are video times, not API wall-clock times. This is sampled video, not every original frame. There is no depth, force feedback, measured stage-by-stage joint state, hidden simulator state, or earlier diagnosis in this request.
+
+Return an English analysis with these sections:
+1. Observed sequence: an ordered timeline with timestamp ranges, describing the arm, gripper, and stapler motion visible in the images.
+2. Failure hypotheses: identify the earliest visible failure if one is supported. Otherwise keep competing explanations and state what distinguishes them. Separate direct observations from inferences. Give the supporting source-frame indices and timestamps for each hypothesis.
+3. Contact and effect: assess whether the images establish physical contact, stapler actuation, and retreat. Mark occluded or between-sample events as unknown; do not infer a completed press from tool position alone.
+4. Uncertainty and next evidence: specify the most useful short interval for denser frames or another sensor/view, and explain which competing hypotheses that evidence would resolve.
+
+Do not invent metric coordinates, force, joint positions, or unseen intermediate events. A final frame alone cannot establish what happened earlier. An open gripper alone does not establish absence of pressing contact. Do not prescribe a code fix unless its necessity follows from the supplied evidence.

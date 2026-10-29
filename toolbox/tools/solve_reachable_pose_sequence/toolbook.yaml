@@ -1,0 +1,128 @@
+schema_version: 1
+name: solve_reachable_pose_sequence
+version: 0.1.0
+summary: >-
+  Task-independent arm/effector selection and chained IK over complete ordered
+  TCP-pose variants. Grasp, place, and contact builders can share this solver.
+usage:
+  when_to_use:
+    - A task-specific builder has produced one or more complete world-frame TCP-pose sequences.
+    - Multiple arms or orientation variants may be feasible.
+  when_not_to_use:
+    - Poses are guessed, stale, in camera coordinates, or require online force/visual servoing.
+    - Continuous collision-free path planning is mandatory.
+  prerequisites:
+    - Every pair is physically valid and every pose sequence is complete, ordered, and task-semantic.
+  examples:
+    - name: solve_builder_output
+      arguments:
+        arm_effector_pairs:
+          - {arm: CANDIDATE_ARM_A, effector: MATCHED_EFFECTOR_A}
+          - {arm: CANDIDATE_ARM_B, effector: MATCHED_EFFECTOR_B}
+        pose_sequence_variants:
+          - variant_id: TASK_VARIANT_A
+            metadata: {task_property: TASK_DEFINED}
+            waypoints:
+              - {stage: pre_action, tcp_pose_world: [X1, Y1, Z1, QX1, QY1, QZ1, QW1]}
+              - {stage: action, tcp_pose_world: [X2, Y2, Z2, QX2, QY2, QZ2, QW2]}
+        based_on: [CURRENT_OBSERVATION_ID]
+        observed_at_s: CURRENT_OBSERVATION_TIME
+        expires_at_s: CURRENT_PLAN_EXPIRY
+        position_uncertainty_m: MEASURED_UNCERTAINTY
+parameters:
+  arm_effector_pairs:
+    meaning: Candidate physical manipulators; each TCP comes from the paired effector profile.
+    format: Array of 1-4 objects, each exactly {arm:string, effector:string}.
+    unit: null
+    frame: null
+    source: list_device_inventory plus mount profiles.
+    constraints: [Each arm must be a joint device, Each effector must be mounted on its paired arm.]
+    do_not: [Do not pair an effector with the opposite arm, Do not preselect one arm by intuition when multiple are valid.]
+  pose_sequence_variants:
+    meaning: Alternative complete task plans; each variant is tested as a whole and no stage is mixed across variants.
+    format: Array of unique variant_id, optional metadata, and ordered waypoints.
+    unit: null
+    frame: world
+    source: A task-specific waypoint builder.
+    constraints: [Every variant must contain all required task stages in execution order, Stage names must be unique within a variant.]
+    do_not: [Do not pass a single easy waypoint when later task stages are required, Do not use this field to request raw IK retries.]
+  based_on:
+    meaning: Observation IDs on which every supplied pose depends.
+    format: Non-empty array of non-empty strings.
+    unit: null
+    frame: null
+    source: Online ObservationRef records.
+    constraints: [Must cover every pose-producing measurement.]
+    do_not: [Do not invent IDs or omit scene-changing observations.]
+  observed_at_s:
+    meaning: Acquisition time of the newest required observation.
+    format: Non-negative number.
+    unit: s
+    frame: session clock
+    source: ObservationRef.
+    constraints: [Must share the active session clock with expires_at_s.]
+    do_not: [Do not substitute wall time.]
+  expires_at_s:
+    meaning: Absolute session-clock time after which the pose plan is stale.
+    format: Number greater than observed_at_s.
+    unit: s
+    frame: session clock
+    source: Upstream task builder and freshness policy.
+    constraints: [Execution must reject or refresh an expired plan.]
+    do_not: [Do not extend without a new observation.]
+  position_uncertainty_m:
+    meaning: Conservative positional uncertainty inherited from upstream geometry.
+    format: Number in [0,0.05].
+    unit: m
+    frame: world
+    source: Upstream perception/calibration estimate.
+    constraints: [Must cover every variant.]
+    do_not: [Do not silently replace an unknown value with zero.]
+  variant_id:
+    meaning: Stable identifier for one task-defined orientation or path variant.
+    format: Unique non-empty string within this call.
+    unit: null
+    frame: null
+    source: Task-specific builder.
+    constraints: [Must identify semantics described by metadata.]
+    do_not: [Do not encode an arm ID; arms are selected independently.]
+  stage:
+    meaning: Semantic execution step used for ordering, failure localization, and later receipts.
+    format: Unique non-empty string within its variant.
+    unit: null
+    frame: null
+    source: Task-specific builder.
+    constraints: [Order in the array is execution order.]
+    do_not: [Do not use anonymous numeric stages when semantic names are available.]
+  tcp_pose_world:
+    meaning: Desired tool-center-point pose for this stage.
+    format: Seven finite numbers [x,y,z,qx,qy,qz,qw]; quaternion normalized internally.
+    unit: Position in m; quaternion dimensionless.
+    frame: world
+    source: Task-specific builder using calibrated geometry.
+    constraints: [TCP is the paired effector profile TCP, not the arm flange.]
+    do_not: [Do not pass flange poses, camera-frame poses, pixels, or Euler angles.]
+returns:
+  selected_arm: First base-ranked arm that solves one complete variant.
+  selected_effector: Mounted TCP effector paired with selected_arm.
+  selected_variant_id: Complete task-defined variant that passed every stage.
+  joint_stages: Ordered stage, TCP pose, flange pose, and chained joint target records.
+  candidate_failures: Rejected pair/variant records with exact failed_stage and reason.
+  provenance: based_on, timing, expiry, frame, and uncertainty are preserved.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: NO_COMPLETE_SEQUENCE
+      symptom: Every pair/variant fails at profile validation or a named IK stage.
+      cause: No discrete chained-IK solution exists for the complete requested task sequence.
+    - code: PAIR_MISMATCH
+      symptom: Effector mount parent does not equal its paired arm.
+      cause: Invalid arm_effector_pairs input.
+  recovery:
+    - Inspect candidate_failures and recheck only the failed geometry or capability.
+    - Generate additional task-valid variants upstream; never delete required later stages to make selection pass.
+    - Use a collision-aware or force-aware planner when discrete IK is insufficient.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py]

@@ -1,0 +1,2 @@
+# No custom tools are installed for the read-only online-recorder smoke test.
+

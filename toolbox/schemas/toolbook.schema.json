@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kinex.local/schemas/toolbook.schema.json",
+  "title": "Kinex on-demand toolbook",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "version", "summary", "usage", "parameters", "returns", "failure_handling", "source"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "summary": {"type": "string", "minLength": 1},
+    "usage": {
+      "type": "object",
+      "required": ["when_to_use", "when_not_to_use", "prerequisites", "examples"],
+      "properties": {
+        "when_to_use": {"type": "array", "items": {"type": "string"}},
+        "when_not_to_use": {"type": "array", "items": {"type": "string"}},
+        "prerequisites": {"type": "array", "items": {"type": "string"}},
+        "examples": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Deep semantic reference keyed by the exact runtime parameter name.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["meaning", "format", "source", "constraints"],
+        "properties": {
+          "meaning": {"type": "string"},
+          "format": {"type": "string"},
+          "unit": {"type": ["string", "null"]},
+          "frame": {"type": ["string", "null"]},
+          "source": {"type": "string"},
+          "constraints": {"type": "array", "items": {"type": "string"}},
+          "do_not": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "returns": {"type": "object"},
+    "failure_handling": {
+      "type": "object",
+      "required": ["inspect_order", "known_failures", "recovery"],
+      "properties": {
+        "inspect_order": {"type": "array", "items": {"type": "string"}},
+        "known_failures": {"type": "array", "items": {"type": "object"}},
+        "recovery": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["entrypoint", "implementation", "tests"],
+      "properties": {
+        "entrypoint": {"type": "string"},
+        "implementation": {"type": "array", "items": {"type": "string"}},
+        "tests": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

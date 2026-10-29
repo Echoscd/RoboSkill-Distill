@@ -1,0 +1,13 @@
+Press the red stapler once in RoboTwin and submit the episode for native evaluation.
+
+Execution policy:
+1. Discover exact device IDs with list_device_inventory.
+2. Read a fresh head_camera RGB-D observation, locate the red stapler with grounding-dino, and transform the measured 3D point to world coordinates with relative_pose. Never guess geometry.
+3. Call plan_reachable_linear_contact with both valid pairs (left_arm+left_gripper and right_arm+right_gripper), outward normal [0,0,1], approach_distance_m=0.10, press_distance_m=0.03, and valid_for_s=60. The tool selects arm and TCP yaw.
+4. For each stage in the exact order approach_joints, contact_joints, press_joints, retreat_joints:
+   a. Call select_servo_speed with the selected arm, that exact stage target, max_duration_s=15, and candidate_fractions=[0.25,0.5,0.75,1.0].
+   b. If feasible=false, stop and end the attempt. Otherwise call blocking Servo with the returned speedFraction and the unchanged target.
+   c. Immediately call verify_joint_arrival on the same arm and exact target with tolerance_rad=0.02. If reached=false or faults is non-empty, stop the arm and end the attempt; do not retry or continue stages.
+5. After a verified retreat, re-observe with head_camera and stop. Do not infer success from Servo, visual appearance, or your own claim. The native simulator evaluator is authoritative.
+
+If any custom tool fails, read its tool.yaml, toolbook.yaml, and source once. Never brute-force raw IK seeds. All coordinates and timestamps must come from the current observation; documentation examples are placeholders only.

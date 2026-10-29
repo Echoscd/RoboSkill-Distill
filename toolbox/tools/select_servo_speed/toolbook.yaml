@@ -1,0 +1,80 @@
+schema_version: 1
+name: select_servo_speed
+version: 0.1.1
+summary: Choose a timeout-aware Servo speed with the same trajectory model Servo uses.
+usage:
+  when_to_use:
+    - Before a blocking joint-space Servo call when execution time is bounded.
+    - After a prior Servo wait timed out because speedFraction was too low.
+  when_not_to_use:
+    - To command motion or verify measured arrival.
+    - To change the target selected by a planner.
+  prerequisites:
+    - arm is loaded and reports current joint positions.
+    - target_joints is copied exactly from the plan stage to be executed.
+  examples:
+    - name: choose_speed_for_approach
+      arguments:
+        arm: left_arm
+        target_joints: [TARGET_J1, TARGET_J2, TARGET_J3, TARGET_J4, TARGET_J5, TARGET_J6]
+        max_duration_s: 15
+        candidate_fractions: [0.25, 0.5, 0.75, 1.0]
+      then:
+        - Call Servo with block=false, the returned speedFraction, and the unchanged target_joints.
+        - Call wait_for_joint_arrival with that same target_joints.
+parameters:
+  arm:
+    meaning: Joint device from which the measured trajectory start is read.
+    format: Loaded Kinex joint device ID string.
+    unit: null
+    frame: null
+    source: The plan stage to be executed.
+    constraints: [Must be identical to the Servo device.]
+    do_not: [Do not plan for one arm and execute on another.]
+  target_joints:
+    meaning: Exact absolute joint goal for the next Servo call.
+    format: Array in profile-declared joint order.
+    unit: rad
+    frame: joint space
+    source: One executable plan stage.
+    constraints: [Length and order must match the arm profile.]
+    do_not: [Do not round, reorder, interpolate, or substitute another stage.]
+  max_duration_s:
+    meaning: Upper bound for Servo's computed simulator world-clock trajectory duration.
+    format: Positive number no greater than 120.
+    unit: s
+    frame: world clock
+    source: Experiment/controller timeout policy.
+    constraints: [Does not predict wall time when the simulator runs slower than real time.]
+    do_not: [Do not treat this as a wall-clock deadline or proof that block=true will return.]
+  candidate_fractions:
+    meaning: Permitted Servo speedFraction values evaluated from slowest to fastest.
+    format: Unique numbers in (0, 1].
+    unit: fraction
+    frame: null
+    source: Controller policy.
+    constraints: [At least one candidate is required.]
+    do_not: [Do not infer that a lower fraction is safer when it violates the duration budget.]
+returns:
+  feasible: True when at least one candidate duration is within max_duration_s.
+  speedFraction: Slowest feasible candidate; pass unchanged to Servo.
+  expected_duration_s: Servo-model duration at the selected fraction.
+  evaluated: Every candidate and its computed duration.
+  measured_start_joints: Live joint vector used as the trajectory start.
+  target_joints: Unchanged requested goal.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: NO_FEASIBLE_SPEED
+      symptom: feasible=false and speedFraction is null.
+      cause: Even speedFraction=1 exceeds max_duration_s or candidates omit a fast-enough value.
+    - code: CONTRACT_ERROR
+      symptom: Tool rejects target length, candidate values, or duration bound.
+      cause: The target or policy input does not match the arm profile.
+  recovery:
+    - Do not call Servo when feasible=false; replan into shorter stages or revise the explicit duration policy.
+    - Prefer block=false Servo followed by wait_for_joint_arrival; predicted duration is not measured arrival.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py]

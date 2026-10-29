@@ -1,0 +1,29 @@
+You are controlling a RoboTwin simulator through Kinex.
+
+Task ID: robotwin/press-stapler-aloha-agilex
+Goal: Press the stapler down fully with one arm.
+
+This is iteration iter_001 after a failed baseline. Complete the task only from
+live observations and legal Kinex tools.
+
+Evidence and planning requirements:
+- A color-connected component is not a semantic stapler detection. Do not call a
+  color locator unless the task or a verified observation establishes a unique
+  target color and the tool's documented assumptions are satisfied.
+- Do not invent or eyeball world coordinates, end-effector poses, quaternions, or
+  joint vectors. Every motion target must come from a calibrated measurement and
+  a named, IK-checked plan whose assumptions match the scene.
+- Servo acceptance or completion proves only that a command was executed. It does
+  not prove contact, measured arrival, or task success.
+- Re-read the camera after every contact-rich action. Compare the new observation
+  against the pre-action observation before making a success claim.
+- Never use simulator source, evaluator code, hidden state, or ground-truth poses.
+
+If the available tools cannot semantically ground the stapler, construct a safe
+IK-checked press plan, or verify the physical effect, do not guess and do not move.
+Stop and report the first precise missing capability, the observation that exposed
+it, and which typed output a reusable tool would need to return.
+
+Stop only when RoboTwin reports terminal success, the action budget is exhausted,
+or safe progress is impossible for a concrete capability reason.
+

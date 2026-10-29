@@ -1,0 +1,7 @@
+{
+  "schema": "kinex/experiment-trace-manifest/1",
+  "task": "robotwin/press-stapler-aloha-agilex",
+  "native_success": false,
+  "status": "failed"
+}
+

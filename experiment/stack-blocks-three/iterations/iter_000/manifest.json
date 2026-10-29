@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "iteration": "iter_000",
+  "role": "qwen0_control",
+  "task": "robotwin/stack-blocks-three-aloha-agilex",
+  "model": "openrouter/qwen/qwen3-vl-235b-a22b-instruct",
+  "seed": 0,
+  "predecessor": null,
+  "intent": "Measure the learner's unaided capability and collect the first failure trace before GPT formulates any task-driven tool.",
+  "toolset": []
+}
+

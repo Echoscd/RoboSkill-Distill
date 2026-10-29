@@ -1,0 +1,12 @@
+# Full evidence stays on the experiment machine and is exported separately.
+**/runs/
+**/preflight/
+**/private-data/
+**/private-config/
+**/launch-workspace/
+**/native-workspace/
+**/preview/
+robotwin-transfer-10/status.tsv
+__pycache__/
+*.py[cod]
+*.pid

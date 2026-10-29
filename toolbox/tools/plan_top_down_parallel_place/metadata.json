@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "name": "plan_top_down_parallel_place",
+  "version": "0.2.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-26",
+  "updated_at": "2026-10-26",
+  "summary": "Generate profile-aware, chained-IK top-down placement stages with bounded wrist-yaw search for an explicit world-frame object-center target.",
+  "tool_type": "composite",
+  "domains": ["placement", "planning", "inverse-kinematics"],
+  "generality": {
+    "score": 8,
+    "rationale": "The planner is independent of object category, color, and perception method, but assumes a centered top-down parallel-jaw hold and vertical placement.",
+    "assumptions": [
+      "The currently held rigid object's center approximately coincides with the TCP.",
+      "The live gripper approach axis is already top-down.",
+      "The requested world-frame target center is stable and collision-free."
+    ],
+    "limitations": [
+      "Does not plan regrasping, side placement, insertion, continuous collisions, or release stability.",
+      "An off-center grasp produces the same offset at placement.",
+      "The target support geometry must be supplied by another perception or planning layer."
+    ],
+    "tested_tasks": ["robotwin/stack-blocks-three-aloha-agilex"]
+  },
+  "level": {
+    "score": 7,
+    "rationale": "It reuses profile and TCP primitives, resolves live frame orientation, constructs three placement stages, and validates chained IK."
+  },
+  "composition": {
+    "dependencies": ["plan_top_down_parallel_grasp"],
+    "strategy": "Reuse the generic grasp planner's profile, transform, TCP, and IK primitives, starting from the live held-object orientation and testing bounded vertical-axis yaw alternatives."
+  },
+  "provenance": {
+    "experiment": "stack-blocks-three",
+    "iteration": "iter_003 through iter_004",
+    "failure_gap": "Qwen could execute an IK-checked grasp but guessed placement joints; the first exact-orientation placement attempt was IK-infeasible at the base target.",
+    "evidence": ["iter_002 formed a red-green stack but failed to place blue", "iter_003 exact-orientation placement missed IK by about 2 cm"]
+  }
+}

@@ -1,0 +1,65 @@
+name: plan_place_on_colored_support
+version: 0.1.0
+title: Plan Place On Colored Support
+kind: perception
+description: >-
+  High-level combo for stacking an already-held rigid object onto the top center
+  of a dominant-color support object. It captures calibrated RGB-D, estimates the
+  support center and top height, combines them with held_object_height_m, preserves
+  the live top-down TCP orientation, and returns IK-checked pre-place, place,
+  release, and retreat stages. Pass held_object_height_m from the preceding grasp
+  plan's object.height_m. This plans but does not execute; re-observe after release.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    camera:
+      type: string
+    arm:
+      type: string
+    gripper:
+      type: string
+    support_color:
+      type: string
+      enum: [green, red, blue, yellow, orange, white, black]
+    held_object_height_m:
+      type: number
+      minimum: 0.008
+      maximum: 0.25
+    placement_clearance_m:
+      type: number
+      minimum: 0
+      maximum: 0.01
+      default: 0.001
+    min_area_px:
+      type: integer
+      minimum: 20
+      maximum: 10000
+      default: 80
+    preplace_distance_m:
+      type: number
+      minimum: 0.03
+      maximum: 0.20
+      default: 0.08
+    retreat_distance_m:
+      type: number
+      minimum: 0.03
+      maximum: 0.20
+      default: 0.08
+  required: [camera, arm, gripper, support_color, held_object_height_m]
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 45
+device_inputs:
+  camera:
+    types: [rgbd]
+  arm:
+    types: [joint]
+  gripper:
+    types: [gripper]
+requires: intrinsics:rgb,intrinsics:depth,intrinsics:kinematics,intrinsics:control,intrinsics:geometry,intrinsics:frames,extrinsics:mount

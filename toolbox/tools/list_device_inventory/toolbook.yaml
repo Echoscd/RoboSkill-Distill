@@ -1,0 +1,27 @@
+schema_version: 1
+name: list_device_inventory
+version: 0.1.0
+summary: >-
+  Expose a bounded read-only inventory of registered Kinex devices so a model can discover capabilities without scanning the workspace.
+usage:
+  when_to_use:
+    - Use when the current task and observation satisfy every field in tool.yaml.
+  when_not_to_use:
+    - Do not guess missing devices, frames, calibration, geometry, or measurements.
+  prerequisites:
+    - Read the concise contract in tool.yaml before constructing arguments.
+  examples: []
+parameters: {}
+returns:
+  summary: Bounded device records containing exact IDs, types, load state, driver actions, and connection kind; it performs no device I/O.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py]
+  known_failures: []
+  recovery:
+    - Re-read the parameter descriptions and verify device IDs, units, and coordinate frames.
+    - If the contract is satisfied but the call still fails, inspect the entrypoint and implementation source.
+    - Record the failed call in failurebox before changing the tool.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py]

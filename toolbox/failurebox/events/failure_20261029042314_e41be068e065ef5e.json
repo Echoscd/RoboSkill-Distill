@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "failure_id": "failure_20261029042314_e41be068e065ef5e",
+  "occurred_at": "2026-10-29T04:23:14.584Z",
+  "tool": {
+    "name": "servo",
+    "version": "0.0.0",
+    "kind": "controller"
+  },
+  "call": {
+    "arguments": {
+      "device": "left_arm",
+      "joints": [
+        -0.5176955,
+        1.9222011,
+        1.4860567,
+        -1.1346104,
+        0.000976,
+        2.6493945
+      ],
+      "speedFraction": 0.2,
+      "block": true,
+      "world": "world"
+    }
+  },
+  "error": {
+    "stage": "runtime",
+    "code": "PyToolError",
+    "message": "world wait timed out for \"world\""
+  },
+  "trace": {
+    "session_id": "01a185e4-307b-729b-80be-f4e0f83291fb",
+    "run_id": null,
+    "trace_ref": null
+  },
+  "diagnosis": {
+    "status": "unreviewed",
+    "category": null,
+    "root_cause": null,
+    "confidence": null
+  },
+  "resolution": {
+    "status": "open",
+    "tool_version": null,
+    "change_log_ref": null,
+    "notes": null
+  },
+  "artifacts": []
+}

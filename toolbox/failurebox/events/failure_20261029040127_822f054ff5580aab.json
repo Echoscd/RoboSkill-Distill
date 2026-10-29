@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "failure_id": "failure_20261029040127_822f054ff5580aab",
+  "occurred_at": "2026-10-29T04:01:27.358Z",
+  "tool": {
+    "name": "plan_reachable_linear_contact",
+    "version": "0.1.0",
+    "kind": "perception"
+  },
+  "call": {
+    "arguments": {
+      "arm_effector_pairs": [
+        {
+          "arm": "left_arm",
+          "effector": "left_gripper"
+        },
+        {
+          "arm": "right_arm",
+          "effector": "right_gripper"
+        }
+      ],
+      "contact_point_world_m": [
+        -0.12613002825892072,
+        -0.09784850197510342,
+        0.7616136235186722
+      ],
+      "surface_outward_normal_world": [
+        0,
+        0,
+        1
+      ],
+      "preferred_tangent_axis_world": [
+        1,
+        0,
+        0
+      ],
+      "approach_distance_m": 0.1,
+      "press_distance_m": 0.03,
+      "observation_id": "obs_000123",
+      "observed_at_s": 5.44,
+      "position_uncertainty_m": 0.01
+    }
+  },
+  "error": {
+    "stage": "runtime",
+    "code": "PyToolError",
+    "message": "Traceback (most recent call last):\n  File \"/LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/tools/plan_reachable_linear_contact/tool.py\", line 6, in <module>\n    from core import plan_reachable_linear_contact\n  File \"/LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/tools/plan_reachable_linear_contact/core.py\", line 15, in <module>\n    from core import plan_linear_contact  # noqa: E402\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nImportError: cannot import name 'plan_linear_contact' from partially initialized module 'core' (most likely due to a circular import) (/LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/tools/plan_reachable_linear_contact/core.py)\nPython interpreter: /LargeModelDev/users/chendong.song/kinex/env/workspaces/press-stapler-harness-v2-seed5/.kinex/python/.venv/bin/python3"
+  },
+  "trace": {
+    "session_id": "01a185d1-372c-7774-b75c-bb6f5fcf11d1",
+    "run_id": null,
+    "trace_ref": null
+  },
+  "diagnosis": {
+    "status": "unreviewed",
+    "category": null,
+    "root_cause": null,
+    "confidence": null
+  },
+  "resolution": {
+    "status": "open",
+    "tool_version": null,
+    "change_log_ref": null,
+    "notes": null
+  },
+  "artifacts": []
+}

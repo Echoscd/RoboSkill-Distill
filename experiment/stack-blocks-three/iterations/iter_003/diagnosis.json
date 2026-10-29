@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "iteration": "iter_003",
+  "status": "failed_early_stop",
+  "teacher_decision": "Retain the generic placement decomposition, add bounded wrist-yaw search, and specify the base-placement policy separately from colored-support stacking.",
+  "observed_gap": "Qwen treated the held red base as its own colored support; exact live-TCP orientation was also IK-infeasible at the requested base target, after which Qwen returned to guessed motions.",
+  "tool_changes": [
+    "plan_top_down_parallel_place",
+    "plan_place_on_colored_support"
+  ]
+}

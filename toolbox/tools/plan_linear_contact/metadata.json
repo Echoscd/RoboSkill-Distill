@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "name": "plan_linear_contact",
+  "version": "0.2.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-27",
+  "updated_at": "2026-10-28",
+  "summary": "Generate an observation-grounded, TCP-compensated and IK-checked linear contact plan from an explicit surface outward normal.",
+  "tool_type": "composite",
+  "domains": ["contact", "planning", "inverse-kinematics"],
+  "generality": {
+    "score": 8,
+    "rationale": "Consumes generic point, normal and uncertainty rather than an object class; applicable to buttons, switches, lids and pressable mechanisms.",
+    "assumptions": [
+      "The contact point and surface normal are measured in the world frame.",
+      "A short straight-line normal contact is appropriate.",
+      "The effector profile provides a TCP rigidly mounted to the arm."
+    ],
+    "limitations": [
+      "No continuous collision checking or force feedback.",
+      "Does not infer the contact point or surface normal.",
+      "Not suitable for sliding, insertion, deformable or torque-dominant contact."
+    ],
+    "tested_tasks": [
+      "robotwin/press-stapler-aloha-agilex (iter_007: native_success)"
+    ]
+  },
+  "level": {
+    "score": 6,
+    "rationale": "Combines observation provenance, frame-aware TCP compensation, contact geometry and chained IK across four stages."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": "Convert a measured point-normal contact into a TCP path, compensate flange-to-TCP geometry and retain only a chained IK-feasible plan."
+  },
+  "provenance": {
+    "experiment": "press-stapler",
+    "iteration": "iter_003",
+    "failure_gap": "Qwen guessed a pixel, depth and servo target because no generic contact planner exposed a provenance-carrying path.",
+    "evidence": [
+      "iter_002 had four servo calls, zero formal plans and native_success=false",
+      "iter_007 generated one formal plan from obs_000048 and finished with native_success=true"
+    ]
+  }
+}

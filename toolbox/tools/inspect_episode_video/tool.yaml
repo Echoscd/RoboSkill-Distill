@@ -1,0 +1,47 @@
+name: inspect_episode_video
+version: 0.1.0
+title: Inspect Episode Video
+kind: perception
+description: >-
+  Inspect recorded motion as ordered image attachments, each mapped to its video
+  time and source-frame index. First inspect the full video, then request shorter
+  intervals to examine contact, slip, or retreat. Reads only the current diagnostic
+  run and performs no device actions. Does not establish task success.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    video_path:
+      type: string
+      description: Exact absolute recording path supplied in the supervisor's video evidence catalog.
+    start_s:
+      type: number
+      minimum: 0
+      default: 0
+      description: Inclusive interval start in seconds relative to the first video frame.
+    end_s:
+      type: number
+      minimum: 0
+      description: Inclusive video-relative interval end; omit to inspect through the last available frame.
+    max_frames:
+      type: integer
+      minimum: 2
+      maximum: 16
+      default: 12
+      description: Maximum image attachments sampled across the interval, preserving its first and last available frames.
+  required: [video_path]
+  examples:
+    - video_path: CURRENT_EPISODE_VIDEO_PATH
+      max_frames: 12
+    - video_path: CURRENT_EPISODE_VIDEO_PATH
+      start_s: SUSPECT_INTERVAL_START_S
+      end_s: SUSPECT_INTERVAL_END_S
+      max_frames: 12
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: false
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 90

@@ -1,0 +1,14 @@
+You are controlling a RoboTwin simulator through Kinex.
+
+Task ID: robotwin/place-container-plate-aloha-agilex
+Goal: Place the target container securely at the center of the target plate.
+
+Complete the task using only live device observations and legal Kinex tools.
+Do not inspect simulator source code, evaluator code, hidden state, or ground-truth
+object poses. The custom toolbox was learned on earlier tasks; use a tool only
+when its documented assumptions match the current scene. Prefer calibrated RGB-D,
+IK-checked plans, and measured gripper contracts. Never invent joint targets or
+claim success from appearance alone. Re-observe after every grasp, release, or
+contact-rich action. Keep the arm and gripper consistent with the plan that
+produced a waypoint. Stop once RoboTwin reports terminal success, or explain the
+precise missing capability if safe progress is no longer possible.

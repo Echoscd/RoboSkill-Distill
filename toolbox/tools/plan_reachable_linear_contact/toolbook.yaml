@@ -1,0 +1,145 @@
+schema_version: 1
+name: plan_reachable_linear_contact
+version: 0.2.1
+summary: >-
+  Compatibility combo over build_linear_contact_waypoints and
+  solve_reachable_pose_sequence. Contact semantics stay in the builder while
+  arm selection and whole-sequence chained IK are reusable by other tasks.
+usage:
+  when_to_use:
+    - A current world-frame contact point and outward normal are available.
+    - More than one arm may reach the target, or one fixed TCP yaw may be singular.
+  when_not_to_use:
+    - Geometry is still in a camera frame or is guessed.
+    - The task requires force control, sliding, insertion, or collision-aware planning.
+  prerequisites:
+    - Every arm-effector pair must be loaded and physically matched.
+    - Observation provenance must refer to the current geometry.
+    - Independently establish that the TCP-origin geometry matches the intended physical contact; this tool cannot select a finger or contact patch.
+  examples:
+    - name: dual_arm_top_down_press
+      arguments:
+        arm_effector_pairs:
+          - {arm: CANDIDATE_ARM_A, effector: MATCHED_EFFECTOR_A}
+          - {arm: CANDIDATE_ARM_B, effector: MATCHED_EFFECTOR_B}
+        contact_point_world_m: [MEASURED_X, MEASURED_Y, MEASURED_Z]
+        surface_outward_normal_world: [0, 0, 1]
+        preferred_tangent_axis_world: [1, 0, 0]
+        approach_distance_m: 0.10
+        press_distance_m: 0.03
+        observation_id: CURRENT_OBSERVATION_ID
+        observed_at_s: CURRENT_OBSERVATION_TIME
+        valid_for_s: 5
+        position_uncertainty_m: MEASURED_UNCERTAINTY
+parameters:
+  arm_effector_pairs:
+    meaning: Candidate physical arm and mounted-effector pairs.
+    format: Array of 1-4 objects, each exactly {arm: string, effector: string}.
+    unit: null
+    frame: null
+    source: list_device_inventory and device mount profiles.
+    constraints: [Each arm must be joint type, Each effector must be mounted on its paired arm.]
+    do_not: [Do not pair a gripper with the opposite arm, Do not omit a valid arm merely to guess reachability.]
+  contact_point_world_m:
+    meaning: Target TCP-origin position at the nominal contact stage; not a calibrated fingertip or verified first-touch point.
+    format: Three finite numbers [x, y, z].
+    unit: m
+    frame: world
+    source: Current calibrated observation transformed through the Kinex frame graph.
+    constraints: [Must correspond to observation_id.]
+    do_not: [Do not pass pixels, camera-frame coordinates, or guessed depth, Do not equate a gripper-center target with physical finger contact.]
+  surface_outward_normal_world:
+    meaning: Surface normal from material into free space; the planner presses in its negative direction.
+    format: Three finite numbers; normalized internally.
+    unit: dimensionless
+    frame: world
+    source: Current local surface geometry.
+    constraints: [Must be nonzero.]
+    do_not: [Do not pass desired press direction.]
+  preferred_tangent_axis_world:
+    meaning: Preferred in-plane TCP axis; the tool also tests its negative and perpendicular axes.
+    format: Three finite numbers.
+    unit: dimensionless
+    frame: world
+    source: Surface frame or deliberate world-axis preference.
+    constraints: [Must not be parallel to the surface normal.]
+    do_not: [Do not manually retry IK seeds when this candidate search fails.]
+  approach_distance_m:
+    meaning: Clearance before contact and after retreat.
+    format: Number in [0.03, 0.25].
+    unit: m
+    frame: null
+    source: Local clearance policy.
+    constraints: [Must exceed press_distance_m.]
+    do_not: [Do not treat as full path length.]
+  press_distance_m:
+    meaning: Required travel beyond first contact; never reduced by this tool.
+    format: Number in [0.002, 0.08].
+    unit: m
+    frame: null
+    source: Mechanism geometry or task policy.
+    constraints: [Must be smaller than approach_distance_m.]
+    do_not: [Do not increase merely to compensate for uncertain localization.]
+  observation_id:
+    meaning: Identifier of the observation that produced the geometry.
+    format: Non-empty string.
+    unit: null
+    frame: null
+    source: Current online ObservationRef.
+    constraints: [Must match timestamp, point, normal, and uncertainty.]
+    do_not: [Do not invent or copy an example ID.]
+  observed_at_s:
+    meaning: Acquisition timestamp of the source observation.
+    format: Non-negative number.
+    unit: s
+    frame: session clock
+    source: Current ObservationRef.
+    constraints: [Must share the active session clock.]
+    do_not: [Do not substitute wall time.]
+  valid_for_s:
+    meaning: Maximum observation age accepted by downstream execution policy.
+    format: Number in (0, 30].
+    unit: s
+    frame: session clock
+    source: Task policy.
+    constraints: [Re-observe after scene-changing action.]
+    do_not: [Do not extend to avoid another observation.]
+  position_uncertainty_m:
+    meaning: Conservative uncertainty of the world contact point.
+    format: Number in [0, 0.05].
+    unit: m
+    frame: world
+    source: Perception/calibration estimate for observation_id.
+    constraints: [Must describe the same point estimate.]
+    do_not: [Do not set zero without an explicit measurement guarantee.]
+returns:
+  contact_model: TCP-origin reference; physical contact feature and physical contact verification are unknown.
+  selected_arm: Arm with a complete chained-IK solution.
+  selected_effector: Effector matched to selected_arm.
+  selected_tangent_axis_world: In-plane orientation that passed every IK stage.
+  joint_stages: Generic ordered stage records containing TCP pose, flange pose, and joints.
+  candidate_failures: Bounded failed candidates preceding the selected plan.
+  candidates_tested: Number of arm/waypoint-variant candidates attempted.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: NO_FEASIBLE_CANDIDATE
+      symptom: All arm/waypoint-variant combinations fail one or more chained IK stages.
+      cause: Target, press depth, or required orientation is infeasible under current profiles.
+    - code: PAIR_MISMATCH
+      symptom: Effector mount does not name the paired arm.
+      cause: arm_effector_pairs contains an invalid physical pairing.
+  recovery:
+    - Recheck measured geometry and observation freshness.
+    - Preserve required press depth; do not silently shrink task semantics.
+    - Record the complete bounded failure set in failurebox before changing behavior.
+source:
+  entrypoint: tool.py
+  implementation: [core.py, ../build_linear_contact_waypoints/core.py, ../solve_reachable_pose_sequence/core.py]
+  tests: [test_core.py]
+contact_geometry_limitation:
+  model: Nominal contact places the TCP origin at contact_point_world_m and aligns TCP positive X opposite the outward normal.
+  missing: Physical contact feature pose, finger selection, gripper aperture and its effect on feature pose, contact patch and continuous collision validation.
+  consequence: Reachability is not a press-skill guarantee; an open gripper may straddle a narrow surface.
+  reusable_mapping: For a calibrated feature C in TCP frame T, world_T_TCP = world_T_C * inverse(TCP_T_C). The feature transform may depend on gripper aperture.
+  status: Known design limitation; warning and evidence labels do not fix physical contact geometry.

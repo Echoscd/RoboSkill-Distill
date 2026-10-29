@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "name": "plan_reachable_linear_contact",
+  "version": "0.2.1",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-29",
+  "updated_at": "2026-10-29",
+  "summary": "Compose linear-contact waypoint generation with generic complete-sequence manipulator selection.",
+  "tool_type": "composite",
+  "domains": ["contact", "planning", "inverse-kinematics", "recovery"],
+  "generality": {
+    "score": 5,
+    "rationale": "Object-independent IK composition, but no physical contact feature is modeled; successful press transfer is unvalidated.",
+    "assumptions": ["Straight surface-normal contact is suitable and TCP-origin targeting matches the intended physical contact feature.", "Discrete chained IK is only a kinematic endpoint test."],
+    "limitations": ["No finger/pad selection, aperture-dependent contact geometry, continuous collision checking, force control, execution, or effect verification.", "Use other waypoint builders for grasping and placing."],
+    "tested_tasks": ["robotwin/press-stapler-aloha-agilex (behavior refactored after harness_v2 iter_005; runtime regression pending)"]
+  },
+  "level": {
+    "score": 7,
+    "rationale": "Composes a task-specific geometry builder with generic physical-pair ranking, TCP transforms, and complete chained IK."
+  },
+  "composition": {
+    "dependencies": ["build_linear_contact_waypoints", "solve_reachable_pose_sequence"],
+    "strategy": "Build four task-valid linear-contact TCP variants, solve each complete sequence across base-ranked arm-effector pairs, and expose legacy fields for existing experiment scripts."
+  },
+  "provenance": {
+    "experiment": "press-stapler",
+    "iteration": "post_harness_v2_iter_005_refactor",
+    "failure_gap": "The prior wrapper mixed contact-specific geometry with generic arm selection, making left/right-arm reasoning unavailable to grasp and place tools.",
+    "evidence": ["The 0.1.x implementation directly generated contact yaw candidates and called a contact-specific IK planner inside the same candidate loop."]
+  }
+}

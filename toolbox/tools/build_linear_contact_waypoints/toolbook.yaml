@@ -1,0 +1,122 @@
+schema_version: 1
+name: build_linear_contact_waypoints
+version: 0.1.1
+summary: >-
+  Task-specific geometry builder for a straight surface-normal contact motion;
+  its arm-independent output can be passed to solve_reachable_pose_sequence.
+usage:
+  when_to_use:
+    - The task requires approach, first touch, straight press, and retreat along a measured surface normal.
+  when_not_to_use:
+    - Grasping, placing, sliding, insertion, force-controlled contact, or guessed geometry.
+  prerequisites:
+    - The point and normal come from the same current calibrated observation.
+    - Independently establish whether TCP-origin alignment is appropriate for the intended physical contact feature.
+  examples:
+    - name: top_down_press
+      arguments:
+        contact_point_world_m: [MEASURED_X, MEASURED_Y, MEASURED_Z]
+        surface_outward_normal_world: [0, 0, 1]
+        preferred_tangent_axis_world: [1, 0, 0]
+        approach_distance_m: 0.10
+        press_distance_m: 0.03
+        observation_id: CURRENT_OBSERVATION_ID
+        observed_at_s: CURRENT_OBSERVATION_TIME
+        valid_for_s: 5
+        position_uncertainty_m: MEASURED_UNCERTAINTY
+parameters:
+  contact_point_world_m:
+    meaning: World target for the TCP origin at the nominal contact stage; no physical first-touch guarantee.
+    format: Three finite numbers [x, y, z].
+    unit: m
+    frame: world
+    source: Current calibrated observation transformed through the frame graph.
+    constraints: [Must correspond to observation_id, Physical contact feature is not represented by this interface.]
+    do_not: [Do not pass pixels, camera coordinates, or guessed depth, Do not assume an open gripper center is a fingertip or contact pad.]
+  surface_outward_normal_world:
+    meaning: Normal pointing from material into free space; approach and press directions are derived, not supplied.
+    format: Three finite numbers; normalized internally.
+    unit: dimensionless
+    frame: world
+    source: Current local surface estimate.
+    constraints: [Must be nonzero.]
+    do_not: [Do not pass the desired press direction; for a horizontal top surface use approximately [0,0,1].]
+  preferred_tangent_axis_world:
+    meaning: Preferred in-plane TCP axis; positive, negative, and two perpendicular variants are emitted.
+    format: Three finite numbers.
+    unit: dimensionless
+    frame: world
+    source: Surface frame or deliberate orientation preference.
+    constraints: [Must not be parallel to the normal.]
+    do_not: [Do not encode arm selection in this value.]
+  approach_distance_m:
+    meaning: Free-space clearance used by both approach and retreat waypoints.
+    format: Number in [0.03, 0.25].
+    unit: m
+    frame: null
+    source: Local clearance policy.
+    constraints: [Must exceed press_distance_m.]
+    do_not: [Do not treat as total path length.]
+  press_distance_m:
+    meaning: Travel beyond first touch along negative outward normal.
+    format: Number in [0.002, 0.08].
+    unit: m
+    frame: null
+    source: Mechanism geometry or task policy.
+    constraints: [Must be smaller than approach_distance_m.]
+    do_not: [Do not inflate it to compensate for perception uncertainty.]
+  observation_id:
+    meaning: Online ObservationRef identifier that produced the geometry.
+    format: Non-empty string.
+    unit: null
+    frame: null
+    source: Current harness observation.
+    constraints: [Must match all geometry and timing fields.]
+    do_not: [Do not invent or copy an example ID.]
+  observed_at_s:
+    meaning: Acquisition time of the source observation.
+    format: Non-negative number.
+    unit: s
+    frame: session clock
+    source: Current ObservationRef.
+    constraints: [Must use the active session clock.]
+    do_not: [Do not substitute wall time.]
+  valid_for_s:
+    meaning: Maximum age of this geometry under the execution policy.
+    format: Number in (0,30].
+    unit: s
+    frame: session clock
+    source: Task policy.
+    constraints: [Re-observe after scene-changing actions.]
+    do_not: [Do not extend it merely to avoid another observation.]
+  position_uncertainty_m:
+    meaning: Conservative uncertainty of the contact point.
+    format: Number in [0,0.05].
+    unit: m
+    frame: world
+    source: Perception and calibration estimate.
+    constraints: [Must describe contact_point_world_m.]
+    do_not: [Do not set zero without a measurement guarantee.]
+returns:
+  contact_model: TCP-origin reference with unknown physical contact feature and unknown physical contact verification.
+  waypoint_variants: Four arm-independent world-frame TCP pose sequences with named stages.
+  motion_semantics: linear_normal_contact.
+  provenance: based_on, observed_at_s, expires_at_s, and position_uncertainty_m are preserved.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: INVALID_CONTACT_FRAME
+      symptom: The normal is zero or the preferred tangent is parallel to it.
+      cause: Incomplete or inconsistent surface geometry.
+  recovery:
+    - Re-estimate the point and surface frame from the current observation.
+    - Use a different task-specific waypoint builder when the required motion is not straight contact.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py]
+contact_geometry_limitation:
+  scope: Kinematic TCP-origin waypoint construction only.
+  unsupported: Finger selection, fingertip offset, aperture-dependent finger pose, contact patch, continuous collision, and force control.
+  consequence: A narrow target may lie in the gap between fingers even when the TCP reaches the nominal contact point.
+  required_for_physical_press: Select and calibrate a physical contact feature; map its desired world pose to the TCP pose using the current effector state. This interface does not perform that mapping.

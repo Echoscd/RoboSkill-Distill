@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "failure_id": "failure_20261029_tcp_contact_feature",
+  "occurred_at": "2026-10-29T14:50:28+08:00",
+  "tool": {"name": "plan_reachable_linear_contact", "version": "0.2.0", "kind": "perception"},
+  "call": {"arguments": {"arm_effector_pairs": [{"arm": "left_arm", "effector": "left_gripper"}, {"arm": "right_arm", "effector": "right_gripper"}], "contact_point_world_m": [-0.12613002825892072, -0.09784850197510342, 0.7616136235186722], "surface_outward_normal_world": [0, 0, 1], "preferred_tangent_axis_world": [1, 0, 0], "approach_distance_m": 0.1, "press_distance_m": 0.03, "observation_id": "obs_000037", "observed_at_s": 12.64, "valid_for_s": 30, "position_uncertainty_m": 0.01}},
+  "error": {"stage": "verification", "code": "UNMODELED_PHYSICAL_CONTACT_FEATURE", "message": "Design review: nominal contact aligns the TCP origin, not a calibrated finger or pad. This is not a tool runtime exception."},
+  "trace": {"run_id": "qwen38_video_iter001_20261029", "session_id": "01a18652-47fc-7577-bb23-d5695b014a57", "tool_call_id": "call_bfd89b41f7814225bc97f36e", "trace_ref": "experiment/press-stapler/runs/qwen38_video/qwen38_video_iter001_20261029/agent/primary-session.jsonl"},
+  "diagnosis": {"status": "reviewed", "category": "contact_model_design_gap", "root_cause": "No representation of the intended physical contact feature, its aperture-dependent pose, or contact patch.", "confidence": "confirmed_by_source", "episode_causality": "Unresolved: contact arrival timed out before formal press. No evidence yet distinguishes finger-gap misalignment from collision, perception error, or controller behavior."},
+  "resolution": {"status": "open", "tool_version": "0.2.1", "change_log_ref": "tools/plan_reachable_linear_contact/changes.jsonl", "notes": "Warnings and unknown contact evidence are exposed. Physical geometry is not repaired; no offset or press depth was invented."},
+  "artifacts": ["experiment/press-stapler/iterations/qwen38_autonomous/research-review.json"]
+}

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f0e8">
+  <title>Kinex Run Monitor</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">KINEX · ROBOTWIN OBSERVATORY</p>
+        <h1 id="task-title">等待任务连接</h1>
+        <p class="subtitle"><span id="model-name">Agent trace</span><span class="dot">·</span><span id="run-id">—</span></p>
+      </div>
+      <div class="top-actions">
+        <span class="status-pill" id="live-status"><i></i> WAITING</span>
+        <button class="ghost-button" id="export-button" type="button">导出快照</button>
+      </div>
+    </header>
+
+    <section class="workspace-grid">
+      <section class="scene-panel panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">SIMULATION SCENE</p>
+            <h2>模拟器实时画面</h2>
+          </div>
+          <div class="camera-meta"><span id="camera-source">NO SIGNAL</span><span id="frame-time">—</span></div>
+        </div>
+        <div class="camera-stage">
+          <img id="camera-feed" alt="RoboTwin head camera live view">
+          <div class="camera-empty" id="camera-empty">
+            <div class="aperture"></div>
+            <strong>等待 head_camera</strong>
+            <span>启动模拟器后将自动接入；离线时显示 trace 中最后一帧</span>
+          </div>
+          <div class="frame-corners" aria-hidden="true"></div>
+          <div class="scene-overlay">
+            <span>HEAD_CAMERA · RGB-D</span>
+            <span id="scene-clock">T+00:00</span>
+          </div>
+        </div>
+
+        <div class="phase-strip" id="phase-strip" aria-label="Task progress">
+          <div class="phase active"><b>01</b><span>观察</span></div>
+          <div class="phase"><b>02</b><span>规划</span></div>
+          <div class="phase"><b>03</b><span>预抓取</span></div>
+          <div class="phase"><b>04</b><span>夹取</span></div>
+          <div class="phase"><b>05</b><span>验证</span></div>
+          <div class="phase"><b>06</b><span>转移</span></div>
+        </div>
+
+        <div class="metric-row">
+          <article><span>工具调用</span><strong id="metric-tools">0</strong><small id="metric-errors">0 errors</small></article>
+          <article><span>模型耗时</span><strong id="metric-latency">0s</strong><small>API latency</small></article>
+          <article><span>Token</span><strong id="metric-tokens">0</strong><small id="metric-cache">cache —</small></article>
+          <article><span>成本</span><strong id="metric-cost">$0.0000</strong><small>OpenRouter</small></article>
+        </div>
+      </section>
+
+      <aside class="inspector">
+        <section class="device-panel panel">
+          <div class="panel-heading compact">
+            <div><p class="section-kicker">EMBODIMENT</p><h2>设备拓扑</h2></div>
+            <span class="count-badge" id="device-count">0 DEVICES</span>
+          </div>
+          <div class="device-map" id="device-map"></div>
+        </section>
+
+        <section class="toolbox-panel panel">
+          <div class="panel-heading compact">
+            <div><p class="section-kicker">CAPABILITY INVENTORY</p><h2>实时工具箱</h2></div>
+            <span class="count-badge" id="tool-count">0 TOOLS</span>
+          </div>
+          <div class="toolbox-controls">
+            <input id="tool-search" type="search" placeholder="搜索工具" aria-label="搜索工具">
+            <button id="used-only" class="filter-button" type="button" aria-pressed="false">仅已使用</button>
+          </div>
+          <div class="tool-list" id="tool-list"></div>
+        </section>
+
+        <section class="timeline-panel panel">
+          <div class="panel-heading compact">
+            <div><p class="section-kicker">INFERENCE TRACE</p><h2>工具调用时间线</h2></div>
+            <button id="follow-button" class="filter-button active" type="button" aria-pressed="true">自动跟随</button>
+          </div>
+          <div class="timeline" id="timeline">
+            <div class="timeline-empty">等待第一个工具调用…</div>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <footer class="run-footer">
+      <div class="footer-state"><span class="pulse-dot"></span><strong id="footer-state">WAITING</strong><span id="footer-detail">尚未发现运行数据</span></div>
+      <div class="footer-path" id="trace-path">—</div>
+      <time id="wall-time">00:00</time>
+    </footer>
+  </main>
+
+  <dialog id="detail-dialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head">
+        <div><p class="section-kicker">TOOL INSPECTOR</p><h2 id="detail-title">Tool</h2></div>
+        <button aria-label="关闭" class="close-button" value="close">×</button>
+      </div>
+      <div class="detail-grid">
+        <section><h3>Input</h3><pre id="detail-input"></pre></section>
+        <section><h3>Output</h3><pre id="detail-output"></pre></section>
+      </div>
+    </form>
+  </dialog>
+  <script src="/app.js" defer></script>
+</body>
+</html>

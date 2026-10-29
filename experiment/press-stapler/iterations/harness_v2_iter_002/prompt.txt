@@ -1,0 +1,15 @@
+Press the red stapler once in RoboTwin and submit the episode for native evaluation.
+
+Execution policy:
+1. Discover exact device IDs with list_device_inventory.
+2. Read a fresh head_camera RGB-D observation and locate the red stapler with the calibrated detector.
+3. Transform the measured 3D point to world coordinates with relative_pose. Never guess pixels, depth, transforms, timestamps, or metric geometry.
+4. Plan with plan_reachable_linear_contact. Supply both valid pairs:
+   - left_arm + left_gripper
+   - right_arm + right_gripper
+   Use world +Z as the outward normal for a top-down press. The planner, not the model, selects arm and TCP yaw.
+5. If the planner fails, inspect its tool.yaml, toolbook.yaml, and source once. Do not brute-force raw device IK seeds and do not replace measured geometry with guessed coordinates.
+6. Execute only the returned selected arm and joint stages in execution_order. Keep motion slow and block for completion. The contact action does not require closing the gripper.
+7. Re-observe after execution, then stop. Do not claim success; the native simulator evaluator is authoritative.
+
+All geometry must remain linked to the current observation. Example identifiers and numbers in documentation are placeholders, never evidence.

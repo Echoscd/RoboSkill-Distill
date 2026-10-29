@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "name": "plan_place_on_colored_support",
+  "version": "0.1.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-26",
+  "updated_at": "2026-10-26",
+  "summary": "Compose colored support geometry and TCP-preserving placement planning into IK-checked stacking stages for an already-held object.",
+  "tool_type": "composite",
+  "domains": ["perception", "placement", "stacking", "inverse-kinematics"],
+  "generality": {
+    "score": 6,
+    "rationale": "It supports different rigid held objects and support shapes, but inherits HSV support segmentation and assumes centered top-down stacking.",
+    "assumptions": [
+      "The support is the largest component of a supported color and has a visible horizontal top.",
+      "The held object was grasped through its center and remains held top-down.",
+      "The held object's height is passed from measured geometry rather than guessed."
+    ],
+    "limitations": [
+      "Does not distinguish touching same-color supports or reason about support stability beyond center placement.",
+      "Does not handle arbitrary semantic categories, side insertion, or continuous collision planning.",
+      "Requires post-release observation to verify the stack."
+    ],
+    "tested_tasks": ["robotwin/stack-blocks-three-aloha-agilex"]
+  },
+  "level": {
+    "score": 8,
+    "rationale": "It orchestrates live RGB-D support geometry, target-height construction, live TCP orientation, profile constraints, and chained placement IK."
+  },
+  "composition": {
+    "dependencies": ["estimate_colored_object_geometry_3d", "plan_top_down_parallel_place"],
+    "strategy": "Convert a perceived support top and measured held-object height into an explicit target center, then invoke the generic placement planner."
+  },
+  "provenance": {
+    "experiment": "stack-blocks-three",
+    "iteration": "iter_003",
+    "failure_gap": "Qwen successfully stacked red and green after using the grasp combo, but guessed placement joints and failed to add blue.",
+    "evidence": ["iter_002 final state has red-green centers within 2.2 mm while blue remains separate; native_success=false"]
+  }
+}

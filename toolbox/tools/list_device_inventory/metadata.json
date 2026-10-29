@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "name": "list_device_inventory",
+  "version": "0.1.0",
+  "status": "experimental",
+  "formulated_by": "gpt",
+  "created_at": "2026-10-28",
+  "updated_at": "2026-10-28",
+  "summary": "Expose a bounded read-only inventory of registered Kinex devices so a model can discover capabilities without scanning the workspace.",
+  "tool_type": "atomic",
+  "domains": ["introspection", "safety", "perception", "planning"],
+  "generality": {
+    "score": 10,
+    "rationale": "Every Kinex task must select registered devices, and the output is independent of task, object class, embodiment, simulator, and perception model.",
+    "assumptions": [
+      "Registered devices have readable Kinex profiles under the active workspace."
+    ],
+    "limitations": [
+      "Activation intent does not prove that a driver is loaded, healthy, or calibrated."
+    ],
+    "tested_tasks": ["robotwin/press-stapler-aloha-agilex"]
+  },
+  "level": {
+    "score": 1,
+    "rationale": "The tool performs one bounded read-only enumeration and profile normalization operation with no device interaction."
+  },
+  "composition": {
+    "dependencies": [],
+    "strategy": "Enumerate immediate device profile directories and normalize a fixed subset of profile metadata."
+  },
+  "provenance": {
+    "experiment": "press-stapler",
+    "iteration": "iter_003",
+    "failure_gap": "Qwen had no model-callable device inventory, attempted an unbounded recursive filesystem scan, and entered a runaway tool-call stream.",
+    "evidence": [
+      "iter_003 second model response produced more than 21000 characters of recursive ls arguments before any detector discovery"
+    ]
+  }
+}
+

@@ -1,0 +1,42 @@
+name: plan_held_bottle_transfer
+version: 0.1.0
+title: Plan Held Bottle Transfer
+kind: perception
+description: >-
+  Plan a collision-clear translation for an already verified bottle grasp. The
+  tool keeps the live TCP orientation and closed gripper unchanged, raises the
+  held bottle to a safe height, and IK-checks a final TCP target. Use only after
+  verify_colored_object_grasp returned grasp_verified=true.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    arm:
+      type: string
+    gripper:
+      type: string
+    target_center_world_m:
+      type: array
+      minItems: 3
+      maxItems: 3
+      items: {type: number}
+    clearance_m:
+      type: number
+      minimum: 0.03
+      maximum: 0.15
+      default: 0.06
+  required: [arm, gripper, target_center_world_m]
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: true
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 30
+device_inputs:
+  arm:
+    types: [joint]
+  gripper:
+    types: [gripper]
+requires: extrinsics:mount

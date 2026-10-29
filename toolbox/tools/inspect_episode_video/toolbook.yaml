@@ -1,0 +1,77 @@
+schema_version: 1
+name: inspect_episode_video
+version: 0.1.0
+summary: Inspect the current episode's recorded motion and choose time intervals for closer visual diagnosis.
+usage:
+  when_to_use:
+    - After native failure, reconstruct what happened before interpreting the final state.
+    - Inspect a suspected contact or slip interval with more densely spaced frames.
+  when_not_to_use:
+    - To replace the native evaluator or infer force, hidden state, or measured joint arrival.
+  prerequisites:
+    - The supervisor supplies a recording catalog and sets KINEX_DIAGNOSTIC_RUN_DIR.
+    - ffmpeg and ffprobe are available in the existing runtime environment.
+  examples:
+    - name: overview_then_detail
+      overview: {video_path: CURRENT_EPISODE_VIDEO_PATH, max_frames: 12}
+      detail:
+        video_path: CURRENT_EPISODE_VIDEO_PATH
+        start_s: OBSERVED_SUSPECT_START_S
+        end_s: OBSERVED_SUSPECT_END_S
+        max_frames: 12
+parameters:
+  video_path:
+    meaning: Exact recording to inspect, constrained to the supervisor-provided diagnostic run.
+    format: Absolute path string to an existing MP4, MOV, MKV, or WebM file.
+    unit: null
+    frame: null
+    source: Failure-analysis video evidence catalog.
+    constraints: [Resolved path must stay within the active diagnostic run, Symlink escapes are rejected.]
+    do_not: [Do not invent recording paths, Do not substitute a final screenshot or another episode's video.]
+  start_s:
+    meaning: Inclusive start of the requested visual interval.
+    format: Finite non-negative number; defaults to zero.
+    unit: s
+    frame: video-relative clock
+    source: A previous video overview or explicit recording timeline.
+    constraints: [At least one recorded frame must fall within the interval.]
+    do_not: [Do not pass API wall-clock timestamps or unaligned simulator timestamps.]
+  end_s:
+    meaning: Inclusive end of the requested visual interval; omission means the last available frame.
+    format: Finite number greater than or equal to start_s, or omitted.
+    unit: s
+    frame: video-relative clock
+    source: A previous video overview or explicit recording timeline.
+    constraints: [The interval must contain a recorded frame.]
+    do_not: [Do not treat omission as zero, Do not assume every event between sampled frames was seen.]
+  max_frames:
+    meaning: Bounded image count distributed across the selected interval.
+    format: Integer in [2,16], default 12.
+    unit: images
+    frame: null
+    source: Diagnosis evidence budget.
+    constraints: [First and last available interval frames are preserved, Short intervals may return fewer images.]
+    do_not: [Do not treat max_frames as FPS, Do not request the whole video repeatedly instead of narrowing the interval.]
+returns:
+  inspection_id: Identifier of this evidence extraction, not a motion plan or task verdict.
+  video_snapshot_sha256: Hash of the exact source snapshot decoded for this call.
+  frames: Ordered source-frame indices, video-relative times, saved image paths, and attachment positions.
+  attachments: Actual image content attached in the same order as frames, not just paths.
+  limitations: Sampling, occlusion, and clock-alignment limits.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: VIDEO_SCOPE
+      symptom: The video path is outside the active run or the supervisor did not enable diagnostic scope.
+      cause: Missing or cross-episode recording reference.
+    - code: EMPTY_INTERVAL
+      symptom: No decoded frame falls in the requested interval.
+      cause: Wrong video time or incomplete recording.
+  recovery:
+    - Use the exact path from the evidence catalog and inspect its overview first.
+    - If recording is unavailable, state the missing temporal evidence and use final-frame evidence with explicit limitations.
+    - If contact is occluded in every recorded view, request an informative view or measurement rather than asserting unseen contact.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py]

@@ -1,0 +1,3 @@
+# Generic capabilities only; semantic detection is a configured device.
+read_gripper_contract
+plan_top_down_parallel_grasp

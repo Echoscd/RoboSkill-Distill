@@ -1,0 +1,52 @@
+name: select_servo_speed
+version: 0.1.1
+title: Select Servo Speed
+kind: perception
+description: >-
+  Read current joints and evaluate Servo's own trajectory model at bounded speed
+  fractions. Returns the slowest candidate whose computed duration does not
+  exceed max_duration_s in simulator world time. World time may run slower than
+  wall time, so this does not guarantee a blocking wait will fit an RPC deadline.
+  Prefer block=false Servo followed by wait_for_joint_arrival. This tool performs
+  no motion and does not establish arrival.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    arm:
+      type: string
+      description: Loaded joint device ID that will receive the Servo command.
+    target_joints:
+      type: array
+      minItems: 1
+      items: {type: number}
+      description: Exact absolute target in profile joint order and radians.
+    max_duration_s:
+      type: number
+      exclusiveMinimum: 0
+      maximum: 120
+      default: 15
+      description: Maximum acceptable computed Servo trajectory duration in world seconds.
+    candidate_fractions:
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items: {type: number, exclusiveMinimum: 0, maximum: 1}
+      default: [0.25, 0.5, 0.75, 1.0]
+      description: Bounded speedFraction values to test; values are sorted ascending.
+  required: [arm, target_joints]
+  examples:
+    - arm: left_arm
+      target_joints: [TARGET_J1, TARGET_J2, TARGET_J3, TARGET_J4, TARGET_J5, TARGET_J6]
+      max_duration_s: 15
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: false
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 10
+device_inputs:
+  arm: {types: [joint]}
+requires: intrinsics:control

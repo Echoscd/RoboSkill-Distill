@@ -1,0 +1,43 @@
+name: verify_joint_arrival
+version: 0.1.0
+title: Verify Joint Arrival
+kind: perception
+description: >-
+  Read a joint device after motion and compare measured joints with one exact
+  commanded target. Returns reached plus per-joint, maximum, and RMS errors.
+  Use after a blocking Servo stage; command acceptance or elapsed time alone
+  does not establish arrival. This tool performs no motion and never retries.
+parameters:
+  type: object
+  additionalProperties: false
+  properties:
+    arm:
+      type: string
+      description: Loaded joint device ID that received the command.
+    target_joints:
+      type: array
+      minItems: 1
+      items: {type: number}
+      description: Exact joint target passed to Servo, in profile joint order and radians.
+    tolerance_rad:
+      type: number
+      exclusiveMinimum: 0
+      maximum: 0.2
+      default: 0.02
+      description: Maximum allowed absolute error for every joint.
+  required: [arm, target_joints]
+  examples:
+    - arm: left_arm
+      target_joints: [TARGET_J1, TARGET_J2, TARGET_J3, TARGET_J4, TARGET_J5, TARGET_J6]
+      tolerance_rad: 0.02
+annotations:
+  read_only: true
+  destructive: false
+  idempotent: false
+  open_world: false
+manual: toolbook.yaml
+entry: tool.py
+timeout_s: 10
+device_inputs:
+  arm: {types: [joint]}
+requires: intrinsics:feedback

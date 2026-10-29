@@ -1,0 +1,51 @@
+schema_version: 1
+name: estimate_colored_object_geometry_3d
+version: 0.1.0
+summary: >-
+  Estimate support-relative center, height, footprint axes, and extents for a dominant-color tabletop object from calibrated RGB-D.
+usage:
+  when_to_use:
+    - Use when the current task and observation satisfy every field in tool.yaml.
+  when_not_to_use:
+    - Do not guess missing devices, frames, calibration, geometry, or measurements.
+  prerequisites:
+    - Read the concise contract in tool.yaml before constructing arguments.
+  examples: []
+parameters:
+  camera:
+    meaning: Calibrated RGB-D camera used for one synchronized capture.
+    format: Loaded Kinex device ID string.
+    unit: null
+    frame: null
+    source: Device inventory and robot profile.
+    constraints: [Must provide RGB intrinsics, registered metric depth, and a world mount.]
+    do_not: [Do not pass a device type or unloaded camera.]
+  color:
+    meaning: Dominant visible color used for HSV segmentation.
+    format: One supported color enum value.
+    unit: null
+    frame: null
+    source: Task description and current RGB observation.
+    constraints: [Target must be distinguishable by the selected color.]
+    do_not: [Do not use color to identify an ambiguous same-color object.]
+  min_area_px:
+    meaning: Minimum connected-component area retained by segmentation.
+    format: Integer in [20, 10000].
+    unit: px
+    frame: null
+    source: Camera resolution and expected visible object size.
+    constraints: [Increase only to reject smaller distractors.]
+    do_not: [Do not use it as a metric object-size threshold.]
+returns:
+  summary: Support-relative world geometry, horizontal axes and extents, preferred closing axis, observation provenance, and uncertainty notes.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py]
+  known_failures: []
+  recovery:
+    - Re-read the parameter descriptions and verify device IDs, units, and coordinate frames.
+    - If the contract is satisfied but the call still fails, inspect the entrypoint and implementation source.
+    - Record the failed call in failurebox before changing the tool.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: []

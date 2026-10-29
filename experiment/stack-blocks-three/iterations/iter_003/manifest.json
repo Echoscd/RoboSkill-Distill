@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "iteration": "iter_003",
+  "role": "qwen_with_generic_grasp_and_support_relative_place",
+  "task": "robotwin/stack-blocks-three-aloha-agilex",
+  "model": "openrouter/qwen/qwen3-vl-235b-a22b-instruct",
+  "seed": 0,
+  "predecessor": "iter_002",
+  "intent": "Test whether generic TCP-preserving placement and a colored-support combo eliminate Qwen's guessed placement joints after the grasp gap was closed.",
+  "toolset": ["plan_colored_top_down_grasp", "plan_place_on_colored_support"]
+}

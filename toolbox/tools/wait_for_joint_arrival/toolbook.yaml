@@ -1,0 +1,95 @@
+schema_version: 1
+name: wait_for_joint_arrival
+version: 0.1.0
+summary: Wall-clock feedback loop for a non-blocking joint-space Servo command.
+usage:
+  when_to_use:
+    - Immediately after Servo returns with block=false.
+    - Simulator world time is slower than wall time or blocking world.wait is unreliable.
+  when_not_to_use:
+    - Before submitting the exact target to the same arm.
+    - To verify contact, visual effect, or native task success.
+  prerequisites:
+    - Servo was called with block=false on arm and target_joints.
+    - No later write replaced that command.
+  examples:
+    - name: submit_then_wait
+      sequence:
+        - "servo(device=left_arm, joints=TARGET, speedFraction=SPEED, block=false)"
+        - "wait_for_joint_arrival(arm=left_arm, target_joints=TARGET, tolerance_rad=0.02, timeout_wall_s=60)"
+        - "If reached=false, stop the arm and do not execute the next stage."
+parameters:
+  arm:
+    meaning: Joint device whose measured positions are polled.
+    format: Loaded Kinex joint device ID string.
+    unit: null
+    frame: null
+    source: The preceding non-blocking Servo call.
+    constraints: [Must be identical to the Servo device.]
+    do_not: [Do not monitor a different arm.]
+  target_joints:
+    meaning: Exact absolute goal submitted by the preceding Servo call.
+    format: Array in profile-declared joint order.
+    unit: rad
+    frame: joint space
+    source: The executed plan stage.
+    constraints: [Length must equal the measured joint vector.]
+    do_not: [Do not round, reorder, interpolate, or substitute another stage.]
+  tolerance_rad:
+    meaning: Per-joint maximum absolute error for one successful sample.
+    format: Positive number no greater than 0.2.
+    unit: rad
+    frame: joint space
+    source: Controller/experiment policy.
+    constraints: [Every joint must be within tolerance.]
+    do_not: [Do not enlarge after seeing a failed result.]
+  timeout_wall_s:
+    meaning: Real elapsed time allowed for the submitted motion to arrive.
+    format: Positive number no greater than 120.
+    unit: wall-clock s
+    frame: null
+    source: Experiment controller policy.
+    constraints: [Must fit inside the outer agent/tool deadline.]
+    do_not: [Do not confuse with Servo duration_s, which uses simulator world time.]
+  poll_interval_s:
+    meaning: Real delay between feedback samples.
+    format: Number from 0.1 through 5.
+    unit: wall-clock s
+    frame: null
+    source: Controller policy.
+    constraints: [Shorter intervals create more device reads.]
+    do_not: [Do not set to zero or busy-poll.]
+  stable_samples:
+    meaning: Consecutive successful samples required before declaring arrival.
+    format: Integer from 1 through 5.
+    unit: samples
+    frame: null
+    source: Controller policy.
+    constraints: [Counter resets after any out-of-tolerance sample.]
+    do_not: [Do not interpret stability as physical contact.]
+returns:
+  reached: True only after stable_samples consecutive within-tolerance readings.
+  timed_out: True only when timeout_wall_s elapsed before arrival.
+  elapsed_wall_s: Real elapsed polling time.
+  samples: Number of measured joint reads.
+  measured_joints: Most recent measured vector.
+  max_abs_error_rad: Largest current absolute joint error.
+  per_joint_error_rad: Current signed measured-minus-target errors.
+  faults: Current device faults; any non-empty value ends polling with reached=false.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: TIMEOUT
+      symptom: timed_out=true and reached=false.
+      cause: Motion was too slow, interrupted, or unable to reach the goal.
+    - code: DEVICE_FAULT
+      symptom: faults is non-empty and reached=false.
+      cause: Joint device reported a fault while polling.
+  recovery:
+    - Stop the arm when reached=false or faults is non-empty.
+    - Preserve the final measured vector and error metrics in the trace.
+    - Never execute the next plan stage after a failed wait.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py]

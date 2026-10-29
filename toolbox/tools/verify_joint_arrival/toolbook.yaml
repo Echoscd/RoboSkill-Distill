@@ -1,0 +1,71 @@
+schema_version: 1
+name: verify_joint_arrival
+version: 0.1.0
+summary: Read-only measured-arrival check for one joint-space command.
+usage:
+  when_to_use:
+    - Immediately after each blocking Servo call in a staged plan.
+    - Diagnosis needs to separate accepted, completed, and reached.
+  when_not_to_use:
+    - Before the command duration has elapsed.
+    - To establish physical contact, task effect, or native success.
+  prerequisites:
+    - arm must be the same loaded joint device used by Servo.
+    - target_joints must be copied exactly from the executed plan stage.
+  examples:
+    - name: verify_press_stage
+      arguments:
+        arm: left_arm
+        target_joints: [TARGET_J1, TARGET_J2, TARGET_J3, TARGET_J4, TARGET_J5, TARGET_J6]
+        tolerance_rad: 0.02
+parameters:
+  arm:
+    meaning: Joint device whose measured positions are checked.
+    format: Loaded Kinex device ID string.
+    unit: null
+    frame: null
+    source: The executed plan and Servo call.
+    constraints: [Must be identical to the Servo device.]
+    do_not: [Do not verify the opposite arm.]
+  target_joints:
+    meaning: Exact commanded joint vector being verified.
+    format: Array in the profile-declared joint order.
+    unit: rad
+    frame: joint space
+    source: The plan stage passed unchanged to Servo.
+    constraints: [Length must equal the measured joint vector.]
+    do_not: [Do not recompute, round further, reorder, or use a different plan stage.]
+  tolerance_rad:
+    meaning: Per-joint maximum absolute error threshold.
+    format: Positive number no greater than 0.2.
+    unit: rad
+    frame: joint space
+    source: Controller/experiment policy.
+    constraints: [Every joint must satisfy the threshold for reached=true.]
+    do_not: [Do not enlarge after seeing a failed result.]
+returns:
+  reached: True only when every joint error is within tolerance_rad.
+  measured_at_s: Timestamp of the post-motion arm reading.
+  max_abs_error_rad: Largest absolute joint error.
+  rms_error_rad: Root-mean-square joint error.
+  per_joint_error_rad: Signed measured-minus-target errors in profile joint order.
+  measured_joints: Joint vector read from the device.
+  target_joints: Target vector used for comparison.
+  faults: Current device faults.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py, core.py]
+  known_failures:
+    - code: LENGTH_MISMATCH
+      symptom: Verification rejects arrays before comparison.
+      cause: Target was copied from another arm or malformed plan stage.
+    - code: NOT_REACHED
+      symptom: reached=false with a finite error vector.
+      cause: Motion completed without measured arrival at the requested tolerance.
+  recovery:
+    - Stop staged execution when reached=false or faults is non-empty.
+    - Preserve the target, measured vector, and error in the trace; never label acceptance as arrival.
+    - Diagnose controller state before any retry.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: [test_core.py]

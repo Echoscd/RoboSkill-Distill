@@ -1,4 +1,6 @@
 import { shortID } from "../util/id.ts"
+import { mkdir, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
 import { serveProcess, terminate } from "../device/serve-process.ts"
 import { spawnProcess } from "../util/process.ts"
 import { abortable } from "../util/abort.ts"
@@ -49,19 +51,82 @@ async function missingDeviceTypes(cwd: string, manifest: PyToolInfo["manifest"])
 async function validateInputs(cwd: string, info: PyToolInfo, args: Record<string, unknown>): Promise<void> {
   // Validate without applying schema defaults; tools still receive the original args.
   z.fromJSONSchema(info.manifest.parameters).parse(args)
+  const devices = await ProfileStore.listDevices(cwd)
   for (const [parameter, input] of Object.entries(info.manifest.device_inputs)) {
     for (const value of deviceInputValues(args, info.manifest.parameters, parameter)) {
       if (typeof value !== "string") throw new PyToolError(`device input "${parameter}" must name a device`)
       const name = input.frame ? value.split(":")[0]! : value
       const device = await ProfileStore.readDevice(cwd, name)
+      const compatible = devices
+        .filter(candidate => input.types.some(type => matchesDeviceType(candidate.type, type)))
+        .map(candidate => `${candidate.name}${candidate.loaded ? "" : " (unloaded)"}`)
+        .join(", ") || "none"
       // The frame graph also recognizes the conventional world frame without a geometry profile.
       if (!device && input.frame && value === "world" && input.types.includes("world")) continue
-      if (!device) throw new PyToolError(`device input "${parameter}": unknown device "${name}"`)
+      if (!device) throw new PyToolError(
+        `device input "${parameter}": unknown device "${name}". This parameter must name a registered device ID, not a device type. Compatible devices (${input.types.join(" | ")}): ${compatible}`,
+      )
       if (!input.types.some((type) => matchesDeviceType(device.type, type)))
-        throw new PyToolError(`device input "${parameter}" accepts ${input.types.join(" | ")}; "${name}" is ${device.type}`)
+        throw new PyToolError(`device input "${parameter}" accepts ${input.types.join(" | ")}; "${name}" is ${device.type}. Compatible devices: ${compatible}`)
       if (!device.loaded) throw new PyToolError(`device input "${parameter}": "${name}" is unloaded`)
     }
   }
+}
+
+function validateOutput(info: PyToolInfo, value: unknown): void {
+  if (!info.manifest.output_schema) return
+  const parsed = z.fromJSONSchema(info.manifest.output_schema).safeParse(value)
+  if (!parsed.success) throw new PyToolError(
+    `tool returned data that does not match output_schema: ${parsed.error.issues.map(issue => `${issue.path.join(".") || "output"}: ${issue.message}`).join("; ")}`,
+  )
+}
+
+const SECRET_KEY = /(authorization|api[-_]?key|password|secret|token)/i
+
+function redact(value: unknown, key = "", depth = 0): unknown {
+  if (SECRET_KEY.test(key)) return "[REDACTED]"
+  if (depth >= 8) return "[MAX_DEPTH]"
+  if (Array.isArray(value)) return value.map(item => redact(item, "", depth + 1))
+  if (value && typeof value === "object")
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([child, item]) => [child, redact(item, child, depth + 1)]))
+  return value
+}
+
+async function recordToolFailure(cwd: string, info: PyToolInfo, args: Record<string, unknown>, error: unknown, sessionID: string): Promise<void> {
+  const configured = process.env.KINEX_FAILUREBOX_DIR
+  const repository = path.join(cwd, "toolbox", "failurebox")
+  const root = configured ? path.resolve(configured) : existsSync(repository) ? repository : path.join(cwd, ".kinex", "failurebox")
+  const events = path.join(root, "events")
+  await mkdir(events, { recursive: true })
+  const occurredAt = new Date().toISOString()
+  const failureID = `failure_${occurredAt.replace(/[-:.TZ]/g, "").slice(0, 14)}_${shortID()}`
+  const item = {
+    schema_version: 1,
+    failure_id: failureID,
+    occurred_at: occurredAt,
+    tool: { name: info.manifest.name, version: info.manifest.version, kind: info.manifest.kind },
+    call: { arguments: redact(args) },
+    error: {
+      stage: "runtime",
+      code: error instanceof NamedError ? error.name : "ToolExecutionError",
+      message: error instanceof Error ? error.message : String(error),
+    },
+    trace: { session_id: sessionID, run_id: null, trace_ref: null },
+    diagnosis: { status: "unreviewed", category: null, root_cause: null, confidence: null },
+    resolution: { status: "open", tool_version: null, change_log_ref: null, notes: null },
+    artifacts: [],
+  }
+  await writeFile(path.join(events, `${failureID}.json`), `${JSON.stringify(item, null, 2)}\n`, { flag: "wx" })
+}
+
+function withToolSource(error: PyToolError, info: PyToolInfo): PyToolError {
+  const contract = path.join(info.directory, "tool.yaml")
+  const manual = path.join(info.directory, info.manifest.manual)
+  const implementation = path.join(info.directory, info.manifest.entry)
+  return new PyToolError(`${error.message}
+Tool contract: ${contract}
+${existsSync(manual) ? `Tool manual: ${manual}\n` : ""}Tool implementation: ${implementation}
+Inspect the contract first, then the manual and source when diagnosis is needed. Do this before asking the user, retrying, or writing an ad-hoc replacement.`, error.data)
 }
 
 const missingDevicesError = (name: string, missing: string[]) =>
@@ -324,23 +389,30 @@ async function resultAttachments(returned: unknown, directory = process.cwd()) {
 }
 
 export async function runPyTool(cwd: string, info: PyToolInfo, args: Record<string, unknown>, ctx: Context): Promise<Result> {
-  const { name, kind } = info.manifest
-  const missing = await missingDeviceTypes(cwd, info.manifest)
-  if (missing.length > 0) throw new PyToolError(missingDevicesError(name, missing))
-  await validateInputs(cwd, info, args)
-  await ctx.ask(
-    kind === "controller"
-      ? {
-          permission: "python_tool_controller",
-          description: `run controller tool ${name} ${JSON.stringify(args)} — it commands devices agent-free until its termination condition`,
-        }
-      : { permission: "python_tool", description: `run perception tool ${name} ${JSON.stringify(args)}` },
-  )
-  await validateInputs(cwd, info, args)
-  const returned = await invoke(cwd, execution(info), args, ctx, 0)
-  return {
-    title: `${name} (${kind} tool)`,
-    output: formatJSON(returned),
-    ...await resultAttachments(returned, cwd),
+  try {
+    const { name, kind } = info.manifest
+    const missing = await missingDeviceTypes(cwd, info.manifest)
+    if (missing.length > 0) throw new PyToolError(missingDevicesError(name, missing))
+    await validateInputs(cwd, info, args)
+    await ctx.ask(
+      kind === "controller"
+        ? {
+            permission: "python_tool_controller",
+            description: `run controller tool ${name} ${JSON.stringify(args)} — it commands devices agent-free until its termination condition`,
+          }
+        : { permission: "python_tool", description: `run perception tool ${name} ${JSON.stringify(args)}` },
+    )
+    await validateInputs(cwd, info, args)
+    const returned = await invoke(cwd, execution(info), args, ctx, 0)
+    validateOutput(info, returned)
+    return {
+      title: `${name} (${kind} tool)`,
+      output: formatJSON(returned),
+      ...await resultAttachments(returned, cwd),
+    }
+  } catch (error) {
+    await recordToolFailure(cwd, info, args, error, ctx.sessionID).catch(failure => log.warn(`cannot record tool failure: ${String(failure)}`))
+    if (error instanceof PyToolError) throw withToolSource(error, info)
+    throw error
   }
 }

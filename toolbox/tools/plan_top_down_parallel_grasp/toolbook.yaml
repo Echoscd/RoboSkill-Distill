@@ -1,0 +1,99 @@
+schema_version: 1
+name: plan_top_down_parallel_grasp
+version: 0.1.0
+summary: >-
+  Generate profile-aware, TCP-compensated, IK-checked top-down parallel-jaw grasp stages from explicit object geometry.
+usage:
+  when_to_use:
+    - Use when the current task and observation satisfy every field in tool.yaml.
+  when_not_to_use:
+    - Do not guess missing devices, frames, calibration, geometry, or measurements.
+  prerequisites:
+    - Read the concise contract in tool.yaml before constructing arguments.
+  examples: []
+parameters:
+  arm:
+    meaning: Arm for IK planning.
+    format: Loaded joint device ID string.
+    unit: null
+    frame: null
+    source: Device inventory.
+    constraints: [Must provide live state and IK.]
+    do_not: [Do not pass joint as an ID.]
+  gripper:
+    meaning: Parallel-jaw end effector mounted on arm.
+    format: Loaded gripper device ID string.
+    unit: null
+    frame: null
+    source: Device inventory and profile.
+    constraints: [Must define TCP, approach axis, closing axis, and aperture limits.]
+    do_not: [Do not infer geometry from the tool name.]
+  object_center_world_m:
+    meaning: Measured center of the target object.
+    format: Three finite numbers ordered [x, y, z].
+    unit: m
+    frame: world
+    source: Current perception result transformed to world.
+    constraints: [Must correspond to the footprint axes and extents.]
+    do_not: [Do not pass a surface point, pixel, or camera-frame point.]
+  major_axis_world_xy:
+    meaning: Horizontal direction of the object's longest footprint axis.
+    format: Two finite numbers ordered [x, y].
+    unit: dimensionless
+    frame: world XY
+    source: Current support-relative geometry estimate.
+    constraints: [Must have nonzero length.]
+    do_not: [Do not pass an image-axis vector without world transformation.]
+  major_extent_m:
+    meaning: Full object footprint extent along major_axis_world_xy.
+    format: Positive number at most 0.40.
+    unit: m
+    frame: object footprint
+    source: Current geometry estimate.
+    constraints: [Must use full extent rather than half extent.]
+    do_not: [Do not substitute object height.]
+  minor_extent_m:
+    meaning: Full object footprint extent perpendicular to the major axis.
+    format: Positive number at most 0.25.
+    unit: m
+    frame: object footprint
+    source: Current geometry estimate.
+    constraints: [Must be compatible with gripper aperture.]
+    do_not: [Do not substitute radius.]
+  pregrasp_distance_m:
+    meaning: Vertical clearance above grasp.
+    format: Number in [0.03, 0.20].
+    unit: m
+    frame: world vertical
+    source: Task clearance policy.
+    constraints: [Must clear the object and support.]
+    do_not: [Do not use as grasp depth.]
+  test_lift_m:
+    meaning: Vertical post-close lift used for verification.
+    format: Number in [0.03, 0.15].
+    unit: m
+    frame: world vertical
+    source: Verification policy.
+    constraints: [Requires re-observation after execution.]
+    do_not: [Do not treat plan completion as grasp success.]
+  clearance_m:
+    meaning: Extra opening beyond object width.
+    format: Number in [0.002, 0.04].
+    unit: m
+    frame: gripper closing axis
+    source: Object uncertainty and gripper geometry.
+    constraints: [Open target must stay within aperture bounds.]
+    do_not: [Do not add to both sides unless implementation specifies it.]
+returns:
+  summary: Profile-aware pregrasp, grasp, and test-lift joint targets, selected yaw, aperture commands, and execution order.
+failure_handling:
+  inspect_order: [tool.yaml, toolbook.yaml, tool.py]
+  known_failures: []
+  recovery:
+    - Re-read the parameter descriptions and verify device IDs, units, and coordinate frames.
+    - If the contract is satisfied but the call still fails, inspect the entrypoint and implementation source.
+    - Record the failed call in failurebox before changing the tool.
+source:
+  entrypoint: tool.py
+  implementation: [core.py]
+  tests: []

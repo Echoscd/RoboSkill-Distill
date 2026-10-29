@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "iteration": "iter_005",
+  "role": "qwen_with_composed_support_buffer_handoff",
+  "task": "robotwin/stack-blocks-three-aloha-agilex",
+  "model": "openrouter/qwen/qwen3-vl-235b-a22b-instruct",
+  "seed": 0,
+  "predecessor": "iter_004",
+  "intent": "Test whether a task policy composed only from existing generic grasp/place tools can bridge disjoint arm workspaces through a table buffer without adding a task-specific controller.",
+  "toolset": ["plan_colored_top_down_grasp", "plan_top_down_parallel_place", "plan_place_on_colored_support"]
+}

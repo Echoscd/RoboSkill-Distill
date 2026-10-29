@@ -1,0 +1,14 @@
+{
+  "schema": "kinex/research-protocol/1",
+  "scope": "Future autonomous manipulation experiments",
+  "instruction_template": "experiment/prompts/robot_agent.txt",
+  "model_input": {
+    "task_fields": ["task_id", "goal"],
+    "allow": ["Shared cross-task evidence, uncertainty, safety, and evaluation instructions", "Current episode observations and tool contracts"],
+    "exclude": ["Iteration identifiers", "Previous runs or history", "Researcher diagnoses", "Required tool selection or order", "Chosen arm", "Task-specific coordinates, distances, speeds, tolerances, or timeouts", "Researcher-supplied action recipes"]
+  },
+  "supervisor_only": ["Model selection", "Seed", "Budget", "Toolset snapshot", "Native evaluation and recording", "Experiment comparisons and change rationale"],
+  "trace_requirements": ["Save exact rendered prompt and template hash", "Preserve raw inputs, outputs, frames, tool results, and evaluator verdict for every run", "Retain original traces without editing"],
+  "interpretation": ["Do not present prescribed execution as autonomous VLM planning", "Do not equate IK reachability with physical contact", "A control or safety restriction is not a task-solving recipe", "Separate prompt, tool-contract, geometry, and model changes when attributing gains"],
+  "not_model_context": true
+}
